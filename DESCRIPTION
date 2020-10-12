@@ -1,13 +1,17 @@
 Package: simrabid
-Type: Package
-Title: What the Package Does (Title Case)
-Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Title: Individual-based model of canine rabies
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Malavika",
+           family = "Rajeev",
+           role = c("aut", "cre"),
+           email = "mrajeev@princeton.edu",
+           comment = c(ORCID = "0000-0001-6030-4995"))
+Description: This package implements a stochastic individual-based model of canine rabies transmission.
+License: GPL-3
 Encoding: UTF-8
 LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
 Imports: 
-    data.table (>= 1.13.0)
+    data.table
