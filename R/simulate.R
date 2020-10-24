@@ -1,38 +1,61 @@
 
-simrabid <- function() {
+simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
+                     params = list(R0 = 1.2, k = 1, iota = 4),
+                     death_prob = get_prob(rate = 0.48, step = 52), # annual death rate to prob
+                     waning_prob = get_prob(rate = 1/3, step = 52), # annual waning to prob
+                     birth_prob = get_prob(rate = 0.52, step = 52), # annual birth rate to prob
+                     days_in_step = 7,
+                     reporting_fun = binom_detect,
+                     generation_fun = gen_gamma,
+                     dispersal_fun = dispersal_gamma,
+                     secondary_fun = negbinom_constrained,
+                     incursion_fun = sim_incursions_pois,
+                     sequential = TRUE, allow_empties = TRUE,
+                     leave_district = TRUE, max_tries = 100,
+                     summary_funs = list(return_env = return_env),
+                     track = TRUE,
+                     prob_revacc = 0.5,
+                     row_probs = NULL,
+                     vacc_type = "coverage") {
 
-  # setup (these objects stay the same throughout simulations)
-  list2env(setup)
+  # pass the start_up objects into the function environment
+  list2env(start_up, envir = environment())
 
-  # init
-  list2env(init(start_pop, start_vacc, N, rows_pop, cell_id, nlocs,
-                x_coord, y_coord))
+  # initialize vaccination & infection
+  list2env(init(start_pop = start_pop, start_vacc = start_vacc,
+                I_seeds = I_seeds, I_dt = I_dt,
+                rows_pop = rows_pop, cell_ids = cell_ids, nlocs = nlocs,
+                x_coord = x_coord, y_coord = y_coord), envir = environment())
 
-  # vaccination steps
+  list2env(vacc_dt, envir = environment()) # spit out data table into environment
 
   for (t in 1:tmax) {
 
     # Demography -----
     # Vaccinated class
-    V <- V - rbinom(nlocs, size = V, prob = deaths) # die first
-    waning <- rbinom(nlocs, size = V, prob = waning)
+    V <- V - rbinom(nlocs, size = V, prob = death_prob) # die first
+    waning <- rbinom(nlocs, size = V, prob = waning_prob)
     V <- V - waning
 
     # Susceptible class
-    S <- S - rbinom(nlocs, size = S, prob = deaths) + waning
-    S <- S + rbinom(nlocs, size = S + V, prob = births)
+    if (sum(is.na(S) | S < 0) > 0) browser()
 
-    # components to add = puppy vaccination (in between campaigns)
-    # and also immigration, colonization of empty patches?
+    S <- S - rbinom(nlocs, size = S, prob = death_prob) + waning
+    S <- S + rbinom(nlocs, size = S + V, prob = birth_prob)
+
+    if (sum(is.na(S) | S < 0) > 0) browser()
+
 
     # Vaccination ----
-    vacc_now <- vacc_dt[tstep == t]
-    if (nrow(vacc_now) > 0) {
-      nvacc <- sim_vacc(vacc_dt = vacc_now,
-                        N = N[, t - 1], S, V, loc_id, prob_revacc, nlocs,
-                        row_id,
-                        additive, row_probs,
-                        vacc_est)
+    inds <- vacc_times == t
+
+    if (sum(inds) > 0) {
+      nvacc <- sim_vacc(vacc_times = vacc_times[inds],
+                        vacc_ests = vacc_ests[inds],
+                        vacc_locs = vacc_locs[inds],
+                        S, V, N, loc_ids, nlocs,
+                        row_ids, row_probs,
+                        vacc_type)
     } else {
       nvacc <- 0
     }
@@ -42,58 +65,111 @@ simrabid <- function() {
     V <- V + nvacc
 
     # Transmission ----
-    # incursions (to do:pass a function)
-    I_dt[max(I_dt$id) + 1:n_incs, ] <- sim_incursions(n_incs, cells_pop, cells_all,
-                                             x_coord_pop,
-                                             y_coord_pop, counter = max(I_dt$id),
-                                             tstep,
-                                             days_in_step = 7)
+    # incursions
+    incs <- incursion_fun(nlocs, rows_pop, params)
 
+    if(sum(incs) > 0) {
 
-    # exposed -> infectious (those in tstep) (better way to do this?)
-    I_now <- I_dt[floor(t_infectious) == t & contact == 1]
-    secondaries <- secondary_fun(nrow(I_now), params)
+      I_incs <- add_incursions(incs, cell_ids, x_coord, y_coord,
+                               counter = max(I_dt$id),
+                               tstep = t, days_in_step)
 
-    # infectious contacts (fix parameterization)
-    exposed <- sim_bites(secondaries, ids, dispersal_fun,
-                         counter = max(I_dt$id), res_m,
-                         row_id, cell_id, t_infectious,
-                         cells_pop, nrow, ncol, x_topl, y_topl, tstep = t,
-                         sequential, allow_empties,
-                         leave_district, max_tries)
+      I_dt[I_incs$id] <- I_incs
 
-    # were those contacts with a susceptible? (this updates exposed in the parent env!)
-    sim_trans(exposed, S, N, nlocs, track)
-
-    exposed$t_infectious <- t_infectious(t_infected = exposed$t_infected,
-                                         days_in_step,
-                                         generation_fun)
-
-    # Update I_dt
-    if(nrow(I_dt) > max(exposed$id)) {
-      I_dt <- double_I(I_dt)
     }
 
-    I_dt[exposed$id] <- exposed
+    # exposed -> infectious (those in tstep) (better way to do this?)
+    I_now <- I_dt[floor(t_infectious) == t & infected == TRUE]
 
-    # Balance ----
+    # Balance I & E class
     I <- tabulate(I_now$row_id, nbins = nlocs)
-    I_loc <- tabulate(I_now[progen_id != 0]$row_id, nbins = nlocs)
-    E <- E + tabulate(exposed[outcome == 1]$row_id, nbins = nlocs) - I_loc
-    S <- S - E
+    I_loc <- tabulate(I_now$row_id[I_now$progen_id > 0], nbins = nlocs)
+    E <- E - I_loc
+
+    if(nrow(I_now) > 0) {
+      secondaries <- secondary_fun(nrow(I_now), params)
+    } else {
+      secondaries <- 0
+    }
+
+    # infectious contacts
+    if(sum(secondaries) > 0) {
+
+      exposed <- sim_bites(secondaries, ids = I_now$id,
+                           x_coords = I_now$x_coord, y_coords = I_now$y_coord,
+                           t_infectious = I_now$t_infectious,
+                           counter = max(I_dt$id),
+                           dispersal_fun, res_m,
+                           row_ids, cell_ids, cells_pop, nrow, ncol,
+                           x_topl, y_topl,
+                           sequential, allow_empties,
+                           leave_district, max_tries)
+
+      # this should only be for ones that were successfully (i.e. within & populated)
+      exp_inds <- exposed$populated & exposed$within
+      out <- sim_trans(row_id = exposed$row_id[exp_inds],
+                       S, E, I, V, nlocs,
+                       track)
+      exposed$contact[exp_inds] <- out$contact
+      exposed$infected[exp_inds] <- out$infected
+
+      # were those contacts with a susceptible?
+      exposed$t_infectious <- 0
+      exposed$t_infectious[exposed$infected] <- t_infectious(n = length(exposed$t_infectious[exposed$infected]),
+                                                             t_infected = exposed$t_infected[exposed$infected],
+                                                             days_in_step,
+                                                             generation_fun)
+
+      # Make sure colum order matches that of I_dt
+      setcolorder(exposed, c('id', 'cell_id', 'row_id', 'progen_id',
+                             'path', 'x_coord', 'y_coord', 'populated',
+                             'within', 't_infected', 'contact', 'infected',
+                             't_infectious'))
+
+      # if not tracking outcomes, then only track infected
+      if(!track) {
+        exposed <- exposed[infected == TRUE]
+        if(nrow(exposed) > 0) {
+          id_now <- max(I_dt$id)
+          exposed$id <- id_now:(id_now + nrow(exposed) - 1)
+        }
+      }
+
+      # Update I_dt
+      if(nrow(exposed) > 0) {
+        if(nrow(I_dt) < max(exposed$id)) {
+          I_dt <- double_I(I_dt)
+        }
+      }
+
+      I_dt[exposed$id] <- exposed
+
+    } else {
+      exposed <- empty_dt
+    }
+
+    # Final balance ----
+    E_new <- tabulate(exposed$row_id[exposed$infected == TRUE], nbins = nlocs)
+    E <- E + E_new
+    if (sum(is.na(S) | S < E_new) > 0) browser()
+
+    S <- S - E_new
+    N <- S + E + I_loc + V
 
     # Update matrices ----
     S_mat[, t] <- S
     E_mat[, t] <- E
     I_mat[, t] <- I
-    V_mat[, V] <- V
-    N_mat[, t] <- S + E + I_loc + V
+    V_mat[, t] <- V
   }
 
-  # Reporting model (takes I_dt as an argument--modifies in parent env)
+  # Reporting model (adds a reported column to the I data.table)
+  reporting_fun(I_dt) # change this so it operates within data.table
 
   # Summary functions which returns list of objs (or list of lists)
   out <- lapply(summary_funs, function(x) x())
+
   return(out)
+
 }
 

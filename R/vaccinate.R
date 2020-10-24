@@ -11,7 +11,7 @@
 #'
 #' @return
 #' @export
-#'
+#' @import data.table
 #' @examples
 #' # Simulate annual campaigns
 # campaign prob can be either a single val or vector of vals corresponding to
@@ -21,27 +21,30 @@
 # alternative sample_tstep (i.e. if you want campaigns to only happen in beginning of year)
 # sample_tstep = function(n) sample.int(12, n, replace = true)
 
-sim_campaigns <- function(loc_id, campaign_prob = 0.5,
+sim_campaigns <- function(locs, campaign_prob = 0.5,
                           coverage = 0.5,
                           sim_years = 10, burn_in_years = 5,
                           steps_in_year = 52,
-                          sample_tstep = function(n) sample.int(52, n, replace = TRUE)) {
+                          sample_tstep = function(n) {
+                            sample.int(52, n, replace = TRUE)
+                          }
+                          ) {
 
-  vacc_dt <- data.table(loc_id = rep(loc_id, each = sim_years),
-                        years = rep(1:sim_years, length(loc_id)))
-  vacc_dt$vaccinated <- rbinom(nrow(vacc_dt), 1, campaign_prob)
-  vacc_dt <- vacc_dt[vaccinated == 1]
+  vacc_dt <- data.table(vacc_locs = rep(locs, each = sim_years),
+                        years = rep(1:sim_years, length(locs)))
+  vacc_dt[, vaccinated := rbinom(.N, 1, campaign_prob)] # probability that location had a campaign
+  vacc_dt <- vacc_dt[vaccinated == TRUE]
 
   if(is.function(coverage)) {
-    coverage <- coverage(nrow(vacc_dt))
+    vacc_ests <- coverage(nrow(vacc_dt)) # coverage acheived during campaign
   }
 
-  vacc_dt[, c("tstep", "vacc") := .(
+  vacc_dt[, c("vacc_times", "vacc_ests") := .(
     sample_tstep(.N) + (years - 1)*steps_in_year + burn_in_years*steps_in_year,
     coverage
   )]
 
-  return(vacc_dt[, c("loc_id", "tstep", "vacc")])
+  return(vacc_dt[, c("vacc_times", "vacc_ests", "vacc_locs")])
 }
 
 #' Simulate vaccination @ scale
@@ -51,12 +54,10 @@ sim_campaigns <- function(loc_id, campaign_prob = 0.5,
 #' @param S
 #' @param V
 #' @param loc_id
-#' @param prob_revacc
 #' @param row_id
-#' @param additive
 #' @param row_probs
 #' @param allocate_by
-#' @param vacc_est
+#' @param vacc_type
 #' @return
 #' @export
 #'
@@ -86,56 +87,49 @@ sim_campaigns <- function(loc_id, campaign_prob = 0.5,
 # Try matching vacc_new instead of doing vacc_new[1] (benchmark)
 # Test & make sure it all works ok
 
-sim_vacc <- function(vacc_dt, N, S, V, loc_id, prob_revacc, nlocs,
-                     row_id, additive = TRUE, row_probs = NULL,
-                     vacc_est = "coverage") {
+sim_vacc <- function(vacc_times, vacc_ests, vacc_locs,
+                     S, V, N, loc_ids, nlocs,
+                     row_ids, row_probs = NULL,
+                     vacc_type = "coverage") {
 
   # make & join up data tables
-  dem_now <- data.table(S, N, V, loc_id, row_id, row_probs)
-  dem_now <- dem_now[loc_id %in% vacc_dt$loc_id]
+  dem_now <- data.table(S, V, N, loc_ids, row_ids, row_probs)
+  dem_now <- dem_now[loc_ids %in% vacc_locs]
 
   # summarize
-  loc_dem <- dem_now[, lapply(.SD, sum), by = "loc_id",
-                     .SDcols = c("S", "N", "V")]
-  vacc_now <- loc_dem[vacc_dt, on = "loc_id"]
+  vacc_now <- dem_now[, lapply(.SD, sum), by = "loc_ids",
+                     .SDcols = c("S", "V", "N")]
+  vacc_now[, vacc := vacc_ests[match(loc_ids, vacc_locs)]]
 
-  if(vacc_est == "coverage") {
+  if(vacc_type == "coverage") {
     vacc_now[, vacc := rbinom(length(vacc), size = N, prob = vacc)]
   }
 
-  vacc_now[, new_vacc := vacc - rbinom(length(vacc),
-                                        size = V, prob = prob_revacc)]
+  vacc_now[, nvacc := vacc - V]
 
-  # if no new vacc and additive campaigns are not possible
-  # then the -new_vacc is the # of vaccinated dogs that went unallocated
-  vacc_now[, c("unallocated",
-               "new_vacc") := .(fifelse(new_vacc < 0 & additive, 0, -new_vacc),
-                                fifelse(new_vacc < 0 & additive, vacc, 0))]
-
-  # if more new vacc than total susceptibles in that vill
-  # then the difference is added to unallocated
-  # & we also constrain new vacc to be maximum the number of susceptibles available
-  vacc_now[, c("unallocated",
-               "new_vacc") := .(fifelse(new_vacc > S, unallocated + (new_vacc - S), unallocated),
-                                fifelse(new_vacc > S, S, new_vacc))]
+  # vacc only new individuals (i.e. vacc)
+  # & we also constrain vacc to be maximum the number of susceptibles available
+  vacc_now[, nvacc := fcase(nvacc < 0, 0L,
+                            nvacc < S & nvacc > 0, as.integer(nvacc),
+                            nvacc > S, as.integer(S))]
 
   # allocate vaccination (filter to current locations)
-  sus_dt <- vacc_now[, c("loc_id", "new_vacc")][dem_now, on = "loc_id"]
+  sus_dt <- vacc_now[, c("loc_ids", "nvacc")][dem_now, on = "loc_ids"]
   # replicate each row by the number of available susceptibles
   sus_dt <- sus_dt[rep(sus_dt[, .I], S)]
 
   # sample locations by the number of available susceptibles
   # and optionally weight that sampling by the probability of vacc in that cell
-  vacc_ids <- sus_dt[, .(row_id = sample(row_id,
-                                          size = new_vacc[1],
+  vacc_ids <- sus_dt[, .(row_id = sample(row_ids,
+                                          size = nvacc[1],
                                           replace = FALSE,
                                           prob = row_probs)),
-                     by = "loc_id"]
+                     by = "loc_ids"]
 
   # update & return V
-  V <- V + tabulate(vacc_ids$row_id, nbins = nlocs) # by row id
+  nvacc <- tabulate(vacc_ids$row_id, nbins = nlocs) # by row id
 
-  return(list(V = V, vacc_now = vacc_now))
+  return(nvacc)
 }
 
 
