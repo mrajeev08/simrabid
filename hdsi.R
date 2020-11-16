@@ -89,58 +89,37 @@ ggt %>%
          x = layout_as_tree(ggt)[, 1],
          y = layout_as_tree(ggt)[, 2]) -> ggt
 
+group_cols <- c("#d95f02", "#7570b3", "#1b9e77")
+names(group_cols) <- 1:3
 tree <- ggraph(ggt, layout = "dendrogram") +
   geom_edge_bend2() +
   geom_node_point(aes(shape = factor(detected), color = factor(group)),
                   size = 2, fill = "white") +
   scale_shape_manual(values = c(21, 16), guide = "none") +
-  scale_color_brewer(palette = "Dark2", guide = "none") +
+  scale_color_manual(values = group_cols,
+                     guide = "none") +
   cowplot::theme_map()
 
 values(rast) <- start_pop
 pop_df <- as.data.frame(rast, xy = TRUE)
 pop_df$pop <- start_pop
+names(group_cols) <- 3:1
 mapped <- ggplot() +
   geom_raster(data = pop_df, aes(x, y, fill = pop), interpolate = TRUE,
               alpha = 0.75) +
   geom_point(
     data = case_data, aes(x = x_coord, y = y_coord,
                           shape = factor(detected),
-                          color = factor(lineage)), size = 4) +
+                          color = factor(lineage)), size = 4, alpha = 0.75) +
   scale_shape_manual(values = c(21, 16), guide = "none") +
-  scale_color_brewer(palette = "Dark2", guide = "none") +
+  scale_color_manual(values = group_cols,
+                     guide = "none") +
   scale_fill_distiller(na.value = "white", direction = 1,
                        palette = "Greys",
                        trans = "log", guide = "none"
   ) +
   cowplot::theme_map() +
-  labs(tag = "A")
-
-# get observed and total distance in time and space ----
-
-# distmat
-dist_mat <- floor(as.matrix(dist(cbind(case_data$x_coord, case_data$y_coord)))/1000)
-
-# timemat
-time_mat <- matrix(0, nrow(case_data), nrow(case_data))
-for (i in 1:nrow(case_data)) {
-  time_mat[i, ] <- case_data$t_infectious[i] - case_data$t_infectious
-}
-
-# genetic
-gen_mat <- matrix(0, nrow(case_data), nrow(case_data))
-for (i in 1:nrow(case_data)) {
-  gen_mat[i, ] <- rpois(nrow(case_data),
-                        1.44e-4/52*11500*(case_data$t_infectious - case_data$t_infected))
-}
-
-dist_dt <- data.table(from = rep(1:nrow(dist_mat), each = nrow(gen_mat)),
-                      to = 1:nrow(dist_mat)*nrow(gen_mat),
-                      gen = as.vector(gen_mat), time = as.vector(time_mat),
-                      dist = as.vector(dist_mat))
-dist_dt <- dist_dt[from != to]
-ggplot(dist_dt) +
-  geom_point(aes(x = time, y = dist))
+  labs(tag = "B")
 
 # Assemble plots ----------------
 
@@ -180,20 +159,8 @@ disp <- ggplot(data = dispersal, aes (x = km, y = Density)) +
   par_theme
 
 toprow <- sec | gen | disp
+bottomrow <- mapped | ts | tree
 
-# Dispersal
-# Generation time
-
-# Example simulation ----
-
-# Spatially
-
-# Transmission tree
-
-# Correlations ----
-
-# apply summary which filters to tstep and just returns cases time &
-# & space & genetic distance
-
-# plot time vs. geographic and genetic space
-
+# figure 1
+fig1 <- toprow / bottomrow
+ggsave("vignettes/hdsi_fig.jpeg", fig1, width = 7, height = 5)

@@ -19,8 +19,8 @@ negbinom_constrained <- function(n, params = list(R0 = 1.2, k = 1),
 
 # dispersal function
 # defaults to Townsend et al. 2013 plos ntds
-dispersal_gamma <- function(n, params = list(disp_shape = 1.46,
-                                         disp_scale = 16.1)) {
+dispersal_gamma <- function(n, params = list(disp_shape = 0.8,
+                                         disp_scale = 1)) {
 
   rgamma(n, shape = params$disp_shape, scale = params$disp_scale)
 

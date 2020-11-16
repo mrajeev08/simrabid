@@ -22,9 +22,9 @@ setup_space <- function(shapefile, resolution = 1000,
 # I_seed <- 10
 # cells_pop <- sample.int(10000, 5000)
 # start_vacc <- round(rnorm(10000, 500))
-setup_sim <- function(tmax, start_pop, cell_ids, rast) {
+setup_sim <- function(tmax, start_pop, rast) {
 
-  inds <- !is.na(rast[])
+  inds <- !is.na(rast[]) & !is.na(start_pop)
   cell_ids <- (1:ncell(rast))[inds]
   loc_ids <- rast[inds]
   nlocs <- length(cell_ids)
