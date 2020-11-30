@@ -16,7 +16,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                      track = TRUE,
                      prob_revacc = 0.5,
                      row_probs = NULL,
-                     vacc_type = "coverage") {
+                     coverage = TRUE) {
 
   # pass the start_up objects into the function environment
   list2env(start_up, envir = environment())
@@ -50,12 +50,11 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     inds <- vacc_times == t
 
     if (sum(inds) > 0) {
-      nvacc <- sim_vacc(vacc_times = vacc_times[inds],
-                        vacc_ests = vacc_ests[inds],
+      nvacc <- sim_vacc(vacc_cov = vacc_cov[inds],
                         vacc_locs = vacc_locs[inds],
                         S, V, N, loc_ids, nlocs,
                         row_ids, row_probs,
-                        vacc_type)
+                        coverage)
     } else {
       nvacc <- 0
     }
