@@ -47,3 +47,15 @@ binom_detect <- function(I_dt, params = list(detect_prob = 0.9)) {
   I_dt[, reported := rbinom(.N, size = 1, prob = params$detect_prob)]
 }
 
+# Getting probability from rate ------------------------------------------------
+
+# ## example 1: turn annual waning rate of 0.33 to weekly prob
+# get.prob(rate = 0.33, step = 52)
+# ## example 2: turn annual birth rate of 0.45 to monthly prob
+# get.prob(rate = 0.45, step = 12)
+
+get_prob <- function(rate, step) {
+  converted <- (1 + rate)^(1/step) - 1
+  return(1 - exp(-converted))
+}
+

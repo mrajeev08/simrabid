@@ -1,37 +1,29 @@
-# These functions should handle zero situations gracefully so you don't have to
-# or write the conditionals in the IBM part? (because then fewer calls)
-
-
-#' Simulate whether a transmission event was successful (i.e. was with a susceptible)
+#' Simulate transmission outcomes of exposures at individual level
 #'
-#' @param S
-#' @param N
-#' @param nlocs
-#' @param track
-#' @param ...
+#' \code{sim_trans} simulates the outcome of each exposure/transmission event
+#' (i.e. whether the exposure was to a susceptible)
 #'
-#' @return
-#' @export
+#' This function takes the locations of each exposure/transmission event, tabulates
+#' them, and then allocates them to individuals of each state (using sampling). These
+#' outcomes can be tracked explicitly (i.e. track if S/E/I/V or M if no individuals left to allocate to
+#' in that location) or just whether with a susceptible (S) or not (M) (see `track` argument in
+#' \code{\link{simrabid}}.
 #'
-#' @examples
-#' cell_id <- sample(1:1000, 100, replace = FALSE)
-#' nlocs <- 1000
-#' S <- sample(1000:1500, nlocs, replace = TRUE)
-#' N <- sample(2000:3000, nlocs, replace = TRUE)
-#' E <- sample(300:400, nlocs, replace = TRUE)
-#' I <- sample(100:200, nlocs, replace = TRUE)
-#' V <- sample(500:1000, nlocs, replace = TRUE)
-#' sim_trans(cell_id = cell_id, nlocs = nlocs,
-#'           S = S, N = N, track = FALSE)
-#' sim_trans(cell_id = cell_id, nlocs = nlocs,
-#'           S = S, N = N, E, I, V, track = TRUE)
-# Notes :
-# only run this if length(cell_id > 0)
-# tests if everything is zero!
-# Tests = if exps is zero
-# Edge case = if prob S/N is zero or S/E/I/V all zero
-# Should be handled before this step?
-# use data.table for line list of cases?
+#' To Do:
+#' - Tests: returns should be same length as length of row_id and should be S/E/I/V/M or S/M (no NAs)
+#' - rewrite in Rcpp? Will it actually speed this up? Maybe by reducing cost of function calls
+#'
+#' @param row_id numeric vector (length >= 1) the row ids corresponding to the grid cell of the exposure (one value per exposure)
+#' @param S,E,I,V numeric vector of state variables (i.e. # of individuals in
+#'   each class in each grid cell) of length nlocs
+#' @param nlocs numeric, number of grid cells total
+#' @param track boolean, whether to explicitly track the outcome of each exposure or
+#'   to only track whether successful or not (i.e. with a suscpetible or no). See details.
+#'
+#' @return a list of two vectors (contact and infected) of same length as `row_id`.
+#'  contact will be NULL if track = FALSE.
+#' @keywords transmit internal
+#'
 sim_trans <- function(row_id, S, E, I, V, nlocs, track = FALSE) {
 
   exps <- tabulate(row_id, nbins = nlocs)
@@ -97,23 +89,53 @@ sim_trans <- function(row_id, S, E, I, V, nlocs, track = FALSE) {
   return(list(contact = contact, infected = infected))
 }
 
-#' Simulate biting and movement
+#' Simulates biting/exposure behavior of currently infected individuals
 #'
-#' @param secondaries
-#' @param ids
-#' @param dispersal_fun
-#' @param counter
-#' @param cells_pop
-#' @param x_topl
-#' @param y_topl
-#' @param sequential
-#' @param allow_empties
-#' @param leave_district
-#' @param max_tries
-#' @param res_m
-#' @param nrow
-#' @param ncol
-#' @param ...
+#' \code{sim_bites} simulates spatially-explicit transmission events per
+#' infectious individual.
+#'
+#' This function takes the currently infectious individuals and the draws of the number of
+#' secondary cases that they seed and simulates their movement.
+#' Movements can be sequential (i.e. infected individuals moves from origin to
+#' first location of exposure, then from this to the second, etc.)
+#' or can be kernel based where movements are all seeded from
+#' the origin location of the infected individual. Movements outside of the bounds
+#' of the simulation or to uninhabitable grid cells can either be accepted (if
+#' `leave_bounds` or `allow_empties` are `TRUE`). If `FALSE`, these movements will not be
+#' accepted and will be redrawn `max_tries` times.
+#'
+#' To Do:
+#' - Tests: returns should have same column structure & order as the I_dt template
+#'   and rows should = sum of secondaries
+#' - rewrite in Rcpp? Will it actually speed this up? Maybe by reducing cost of function calls
+#'
+#' @param secondaries numeric vector of number of secondary cases for each infectious individual
+#' @param ids numeric vector of the ids of infected individuals (progenitor ids)
+#' @param x_coords numeric vector, x coordinate (Easting) of infected individuals
+#' @param y_coords numeric vector, y coordinate (Northing) of infected individuals
+#' @param t_infectious numeric vector, the time (fractional time step) at which each
+#'   individual became infectious
+#' @param counter integer, the id number to start with for resulting secondary cases
+#' @param dispersal_fun function with a single parameter, n, which will draw distances
+#'   for each individual to move
+#' @param row_ids integer vector, the row ids corresponding to each grid cell in which
+#'   the infectious individual is starting from
+#' @param cell_ids integer vector, the cell ids corresponding to each grid cell in which
+#'   the infectious individual is starting from
+#' @inheritParams sim_movement
+#' @param sequential boolean, if TRUE then movements are sequential, if FALSE, then
+#'   movements are kernel based (see Details)
+#' @inheritParams accept
+#' @param max_tries integer, the maximum number of tries to make before accepting
+#'   an invalid movement (i.e. transmission event fails due to either leaving the
+#'   bounds of the simulation or moving to an uninhabitable grid cell) if either
+#'   or both leave_bounds and allow_empties are FALSE.
+#'
+#' @import data.table
+#' @return a data.table that corresponds to the columns in I_dt in the simulation.
+#' See \code{\link{simrabid}} for full description.
+#' @keywords transmit internal
+#'
 sim_bites <- function(secondaries, ids = I_now$id,
                       x_coords = I_now$x_coord, y_coords = I_now$y_coord,
                       t_infectious = I_now$t_infectious,
@@ -122,7 +144,7 @@ sim_bites <- function(secondaries, ids = I_now$id,
                       row_ids, cell_ids, cells_pop, nrow, ncol,
                       x_topl, y_topl,
                       sequential = TRUE, allow_empties = TRUE,
-                      leave_district = TRUE, max_tries = 100) {
+                      leave_bounds = TRUE, max_tries = 100) {
 
   # just use rep(.I situation to replicate?) (see how it does vs. multiple reps)
   progen_ids <- rep(ids, secondaries)
@@ -156,7 +178,7 @@ sim_bites <- function(secondaries, ids = I_now$id,
                              x0 = x, y0 = y, x_topl,
                              y_topl, res_m, ncol,
                              nrow, cells_pop, path)
-        accept <- accept(leave_district, allow_empties, move$within,
+        accept <- accept(leave_bounds, allow_empties, move$within,
                          move$populated)
 
         tries <- tries + 1
@@ -181,7 +203,7 @@ sim_bites <- function(secondaries, ids = I_now$id,
         nrow, cells_pop, path = 0)
       ) # not sequential
 
-    accept <- accept(leave_district, allow_empties, within = out$within,
+    accept <- accept(leave_bounds, allow_empties, within = out$within,
                      populated = out$populated)
 
     tries <- 0
@@ -195,7 +217,7 @@ sim_bites <- function(secondaries, ids = I_now$id,
                      x_topl, y_topl, res_m, ncol, nrow, cells_pop,
                      path = 0L))
 
-      accept <- accept(leave_district, allow_empties, within = out$within,
+      accept <- accept(leave_bounds, allow_empties, within = out$within,
                        populated = out$populated)
 
       tries <- tries + 1
@@ -211,25 +233,34 @@ sim_bites <- function(secondaries, ids = I_now$id,
   return(out)
 }
 
-# above should inherit params x_topl, y_topl, res_m, ncol, nrow, cells_pop!
-# populated & within are boolean
-#' Simulate movement from origin, angle, and distance
+#' Simulate individual movements
 #'
-#' @param angle
-#' @param distance
-#' @param x0
-#' @param y0
-#' @param x_topl
-#' @param y_topl
-#' @param res_m
-#' @param ncol
-#' @param nrow
-#' @param cells_pop
+#' Simulates movemement of individuals in continuous space.
 #'
-#' @return
-#' @export
+#' This simulates movement and uses the top-left coordinates and 1-based indexing
+#' of raster cell ids to identify the grid cell moved to by an individual.
 #'
-#' @examples
+#' @param angle numeric vector [0, 360] or value, angle at which to move at
+#' @param distance numeric vector or value, distance to move
+#' @param x0 numeric vector or value, the x origin of the infected individual
+#' @param y0 numeric vector or value, the y origin of the infected individual
+#' @param x_topl numeric, the top left x coordinate of the grid on which
+#'   movement is being simulated
+#' @param y_topl numeric, the top left y coordinate of the grid on which
+#'   movement is being simulated
+#' @param res_m numeric, the grid cell resolution in meters
+#' @param ncol numeric, the number of columns in the grid
+#' @param nrow numeric, the number of rows in the grid
+#' @param cells_pop integer vector, the cell ids of grid cells that are populated
+#'   or generally where movements are valid to
+#' @param path integer vector or value, if sequential is FALSE then 0, if TRUE then
+#'  the path id (i.e. which step of the movements) to pass through and assign to exposed
+#'
+#' @return a list with the resulting x and y coordinates, cell ids, whether
+#'   the movement was to a populated cell, whether the movement fell within the bounds
+#'   of the simulation, and the path id for the exposed.
+#' @keywords transmit internal
+#'
 sim_movement <- function(angle, distance, x0, y0, x_topl,
                          y_topl, res_m, ncol, nrow, cells_pop,
                          path) {
@@ -252,24 +283,28 @@ sim_movement <- function(angle, distance, x0, y0, x_topl,
 
 }
 
-#' accept movement made
+#' Accept a simulated movement
 #'
-#' @param leave_district
-#' @param allow_empties
-#' @param within
-#' @param populated
+#' Helper function to determine if a simulated movement is valid.
+#' To do: tests (same length as within and boolean no NAs)
 #'
-#' @return
-#' @export
+#' @param leave_bounds boolean, are movements to outside of the boundaries of the are being
+#'   simulated valid
+#' @param allow_empties boolean, are movements to empty patches (i.e. with no dogs) valid
+#' @param within boolean vector, whether movement falls within bounds
+#' @param populated boolean vector, whether movement falls within a populated area
 #'
-#' @examples
-#' # inherit params: leave_district allow_empties
-accept <- function(leave_district, allow_empties,
+#' @return a boolean vector of length `within`/`populated` corresponding to whether
+#'   a movement is accepted as valid
+#'
+#' @keywords transmit internal
+#'
+accept <- function(leave_bounds, allow_empties,
                    within, populated) {
 
   accept <- rep(1, length(within))
 
-  if(!leave_district) {
+  if(!leave_bounds) {
     accept <- ifelse(within, 1, 0)
   }
 
@@ -278,53 +313,5 @@ accept <- function(leave_district, allow_empties,
   }
 
   return(accept)
-}
-
-sim_incursions_pois <- function(nlocs, rows_pop,
-                                params = list(iota = 4),
-                                steps = 4) {
-
-  # number of incursions this week
-  n_incs <- rpois(1, params$iota/steps)
-
-  # sample cell ids by nlocs
-  row_id <- sample(rows_pop, n_incs, replace = TRUE)
-  incs <- tabulate(row_id, nbins = nlocs)
-  return(incs)
-}
-
-# pass through args? or params? or ...?
-sim_incursions_hardwired <- function(nlocs, rows_pop,
-                                     row_ids = args$row_ids_empirical,
-                                     tsteps = args$tstep_empirical,
-                                     current_tstep = t) {
-
-  # filter list of empirical incursions
-  row_id <- row_ids[tsteps %in% current_tstep & row_ids %in% rows_pop]
-  incs <- tabulate(row_id, nbins = nlocs)
-  return(incs)
-}
-
-
-add_incursions <- function(incs, cell_ids, x_coord, y_coord, tstep,
-                           counter, days_in_step = 7) {
-
-  n_incs <- sum(incs)
-
-  # date infectious (this tstep just draw the day!)
-  t_infectious <- (sample(1:days_in_step, n_incs,
-                          replace = FALSE) + tstep)/days_in_step
-  row_id <- rep(which(incs > 0), incs[incs > 0])
-  cell_id <- rep(cell_ids[incs > 0], incs[incs > 0])
-
-  # incursions have a progenitor id of -1
-  data.table(id = counter + 1:n_incs,
-             cell_id, row_id, progen_id = -1L,
-             path = 0L,
-             x_coord = x_coord[row_id],
-             y_coord = y_coord[row_id],
-             populated = TRUE, within = TRUE,
-             t_infected = 0, contact = "N",
-             infected = TRUE, t_infectious)
 }
 

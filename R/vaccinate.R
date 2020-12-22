@@ -10,6 +10,7 @@
 #' parameter (n = the number of values to return). Defaults to using a weekly
 #' time step, but this can be changed through the steps_in_year
 #' parameter. See examples for more details.
+#'
 #' To Do:
 #' - Make it possible to pass location specific times & cov?
 #' - Do we need to be flexible with steps_in_year?
@@ -96,30 +97,29 @@ sim_campaigns <- function(locs, campaign_prob = 0.5,
 #'
 #' \code{sim_vacc} simulates the number of vaccinated individuals at scale
 #'
-#' Translates coverage estimates from \code{\link{sim_campaigns}
+#' Translates coverage estimates from \code{\link{sim_campaigns}}
 #' or from user defined data.table of location specific vaccination coverage/numbers
 #' filtered to the current timestep into numbers of vaccinated individuals in each
 #' grid cell at the scale specified in the simulation. Assumes that all currently vaccinated
 #' individuals are revaccinated (so campaigns are not additive). If scale of vaccination is at a coarser
 #' resolution (i.e. at village level) allocates to grid cell based on number of susceptibles available.
-#' This can also be modified by passing `row_probs`, grid cell level probabilities of vaccination (i.e. based on
-#' household surveys or spatial covariates).
+#' This can also be modified by passing `row_probs`, grid cell level probabilities of vaccination (i.e. based on household surveys or spatial covariates).
+#'
 #' To Do:
-#' - keep internal?
 #' - Tests/ catches for lengths? This might slow things down! (maybe should be higher level test/catch)
 #' - Tests: return should be same length as nlocs, should be positive integer & non NA
 #'
 #' @param vacc_cov numeric vector of coverage estimates (either [0, 1] or the number vaccinated)
 #' @param vacc_locs vector of numeric or character ids of same length as `vacc_cov`,
 #'   the locations corresponding to the coverage estimates
-#' @param S, V, N numeric vector of Susceptibles, Vaccinated, and the Population size
+#' @param S,V,N, numeric vector of Susceptibles, Vaccinated, and the Population size
 #'   respectively, of same length
 #' @param loc_ids vector of numeric or character ids of same length as **S/V/N** that
 #'   matches the demographic vectors to the locations from `vacc_locs`
 #' @param nlocs numeric, the total number of grid cells being simulated (i.e. at the scale of the simulation,
 #'   this can be different than the scale of the vaccination campaigns)
-#' @param row_ids numeric vector, the row id corresponding to the demographic vectors (S/V/N) to
-#'   sample where vaccinations get allocated to
+#' @param row_ids numeric vector of same length as **S/V/N** of the row id corresponding to the demographic vectors to
+#'   sample which grid cell vaccinations are allocated to
 #' @param row_probs numeric vector, optionally can pass the probability of vaccination
 #'   for each grid cell, defaults to NULL.
 #' @param coverage boolean, defaults to TRUE, if TRUE then coverage estimates [0, 1]
@@ -131,12 +131,9 @@ sim_campaigns <- function(locs, campaign_prob = 0.5,
 #'
 #' @import data.table
 #' @keywords internal
-#' @export
 #'
-sim_vacc <- function(vacc_cov, vacc_locs,
-                     S, V, N, loc_ids, nlocs,
-                     row_ids, row_probs = NULL,
-                     coverage = TRUE) {
+sim_vacc <- function(vacc_cov, vacc_locs, S, V, N, loc_ids, nlocs,
+                     row_ids, row_probs = NULL, coverage = TRUE) {
 
   # make & join up data tables
   dem_now <- data.table(S, V, N, loc_ids, row_ids, row_probs)

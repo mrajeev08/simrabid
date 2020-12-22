@@ -1,31 +1,18 @@
 
 # simrabid
 
-<!-- badges: start -->
-<!-- badges: end -->
+`simrabid` is an implementation of a spatially explicit, individual-based model of canine rabies.
 
-The goal of simrabid is to ...
+It is a work in progress, and eventually will be an R package with vignettes and documentation! But for now to play with the 
+development version: clone the repo and from within the directory, run `devtools::load_all()` in R or Rstudio.
 
-## Installation
+## Dependencies
 
-You can install the released version of simrabid from [CRAN](https://CRAN.R-project.org) with:
-
-``` r
-install.packages("simrabid")
-```
-
-## Example
-
-This is a basic example which shows you how to solve a common problem:
-
-``` r
-library(simrabid)
-## basic example code
-```
+- Just [`data.table`](https://rdatatable.gitlab.io/data.table/) so far!
+- And devtools in the short term for dev.
 
 ## To Do
 
-- Commit everything as is for now
 - Keys for faster data.table filtering (i.e. for boolean values especially! store the 0/1 as logical!)
 - Do tests to make sure it makes sense with SD data (unit tests?!)
 - Document and build! (managing namespace & dependencies)

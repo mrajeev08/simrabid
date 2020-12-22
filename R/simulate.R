@@ -11,7 +11,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                      secondary_fun = negbinom_constrained,
                      incursion_fun = sim_incursions_pois,
                      sequential = TRUE, allow_empties = TRUE,
-                     leave_district = TRUE, max_tries = 100,
+                     leave_bounds = TRUE, max_tries = 100,
                      summary_funs = list(return_env = return_env),
                      track = TRUE,
                      prob_revacc = 0.5,
@@ -102,7 +102,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                            row_ids, cell_ids, cells_pop, nrow, ncol,
                            x_topl, y_topl,
                            sequential, allow_empties,
-                           leave_district, max_tries)
+                           leave_bounds, max_tries)
 
       # this should only be for ones that were successfully (i.e. within & populated)
       exp_inds <- exposed$populated & exposed$within

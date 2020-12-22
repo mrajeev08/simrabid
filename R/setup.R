@@ -1,27 +1,69 @@
-# this will transform things into Eastings/Northings!
-# Double check dimensions of xcoord/ycoord pls!
-
-# Also get starting population here!
+#' Setup spatial bounds of simulation
+#'
+#' \code{setup_space} creates the spatial grid of the simulation from a user defined
+#' shapefile and resolution. If vaccination data are aggregated at a larger scale,
+#' pass the id column (i.e. numeric id of the administrative unit) to assign each grid cell to.
+#' Alternatively if vaccination data are aggregated at the grid cell level or vaccination
+#' is absent, then pass NULL to `id_col`.
+#'
+#' To do:
+#' - Add examples with sf and sp & different id_col
+#' - Tests: resolution too large? if no fasterize, if no id col
+#'
+#' @param shapefile a shapefile (either an sf or sp object) of the area being simulated
+#'   should be projected in UTM coordinates
+#' @param resolution numeric, the resolution in meters
+#' @param id_col character, the name of the attribute/column to rasterize the data by,
+#'   largely for allocating vaccinations
+#' @param use_fasterize boolean, if TRUE and class of shapefile is sf will use the
+#'   fasterize package (if installed)
+#'
+#' @importFrom raster rasterize res raster
+#' @return raster of simulation bounds rasterized by the id column specify (i.e.
+#' each grid cell allocated to a location)
+#' @export
+#' @keywords setup
+#'
 setup_space <- function(shapefile, resolution = 1000,
                         id_col = "VILLCODE",
                         use_fasterize = FALSE) {
+
   r <- raster(shapefile)
   res(r) <- resolution # res in meters
-  rast <- rasterize(shapefile, r)
-  return(rast)
+
+  if(is.null(id_col)) {
+
+    values(r) <- 1:length(r)
+    return(r)
+
+  } else {
+
+    if(fasterize & "sf" %in% class(shapefile) & require(fasterize)) {
+      rast <- fasterize::fasterize(shapefile, r, field = id_col)
+    } else {
+      rast <- rasterize(shapefile, r, field = id_col)
+    }
+
+    return(rast)
+  }
+
 }
 
-
-# return a list of the objects in this environment
-# then when you start the function you can do a list2env call of setup
-# should be faster than setting it up each time you run the simulation
-# especially for large matrices
-# nlocs <- 10000
-# tmax <- 1000
-# start_pop <- round(rnorm(10000, 1000))
-# I_seed <- 10
-# cells_pop <- sample.int(10000, 5000)
-# start_vacc <- round(rnorm(10000, 500))
+#' Set-up simulation
+#'
+#' \code{setup_sim} takes inputs and generates all needed outputs to be passed
+#' to \code{\link{simrabid}}.
+#'
+#' @param tmax integer, the maximum number of time steps to run the simulation for
+#' @param start_pop integer vector, the population size in each cell of `rast`
+#' @param rast raster, from `setup_space` the output raster with each cell allocated
+#'   to a location
+#'
+#' @return a list of objects needed for the simulation
+#' @export
+#' @import data.table
+#' @keywords setup
+#'
 setup_sim <- function(tmax, start_pop, rast) {
 
   inds <- !is.na(rast[]) & !is.na(start_pop)
@@ -61,6 +103,13 @@ setup_sim <- function(tmax, start_pop, rast) {
               y_coord = coords[, 2], res_m = res(rast)[1], tmax = tmax))
 }
 
+#' Initialize the simulation
+#'
+#' \code{init} starts up the simulation by drawing the starting state values
+#'   and seeds infectious cases
+#' @keywords internal
+#' @import data.table
+#'
 init <- function(start_pop, start_vacc, I_seeds, I_dt,
                  rows_pop, cell_ids, nlocs,
                  x_coord, y_coord) {
@@ -95,7 +144,10 @@ init <- function(start_pop, start_vacc, I_seeds, I_dt,
   return(list(S = S, V = V, I = I, E = E, I_dt = I_dt, N = start_pop))
 }
 
-# Doubles this
+#' Doubles the infection line list
+#'
+#' @keywords internal
+#'
 double_I <- function(I_dt) {
   I_skeleton <- data.table(id = 0, cell_id = 0, row_id = 0,
                            progen_id = 0, path = 0L, x_coord = 0,
@@ -106,5 +158,3 @@ double_I <- function(I_dt) {
   I_dt <- rbind(I_dt, I_skeleton[rep(I_skeleton[, .I], nrow(I_dt))])
   return(I_dt)
 }
-
-# double_I(I_dt)
