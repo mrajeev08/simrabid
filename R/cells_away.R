@@ -1,22 +1,24 @@
-cells_away <- function(origin_cell, dist_m, res_m, ncol, nrow, ncells) {
+# By angle works! How to do this with populated & within for sampling?
+# Don't deal with it here...how to separate populated vs. out of district vs. out of bounds (out of district & out of bounds needs to be combined somehow--or treat it all as one and recommend a buffer of epmty cells on all sides! )
+cells_away <- function(x0, y0, dist_m, res_m, ncol, nrow) {
 
-  n_away <- floor(dist_m/res_m)
-  origin_row <- ceiling(origin_cell/ncol)
-  origin_col <- ifelse(origin_cell %% ncol == 0, ncol, origin_cell %% ncol)
+  n_away <- floor(dist_m/res_m) * 4
 
   if(n_away == 0) {
     return(origin_cell)
   } else {
-    aways <- data.table(expand.grid(col = -n_away:n_away, row = -n_away:n_away))
-    aways <- aways[abs(row) + abs(col) != 0 & pmax(abs(col), abs(row)) == n_away]
-    aways <- aways[, c("col", "row") := .(origin_col + col,
-                                          origin_row + row)]
-    aways <- aways[row <= nrow & row > 0 & col <= ncol & col > 0]
-    aways[, cell_id :=  (col - 1) * ncol  + ifelse(row %% ncol == 0,
-                                                   ncol,
-                                                   row %% ncol)]
-    if(nrow(aways) > 0) out <- aways$cell_id else out <- ncells + 1
-    return(out)
+    incr <- (2 * pi) / n_away
+    angle <- 0 + 1:n_away * incr
+
+    x_coord <- (sin(angle) * dist_m) + x0 # convert to m
+    y_coord <- (cos(angle) * dist_m) + y0
+
+    # This means can go anywhere
+    col <- ceiling((x_coord - x_topl)/res_m)
+    row <- ceiling(-(y_coord - y_topl)/res_m)
+    cell_id <- row*ncol - (ncol - col)
+
+    return(cell_id)
   }
 
 }
