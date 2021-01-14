@@ -22,19 +22,23 @@ library(data.table)
 library(rgdal)
 library(rmapshaper)
 library(fasterize)
+library(patchwork)
 devtools::load_all()
 ```
 
-## Outline
-1. Describe the two ways that you can specify movement in simrabid
-2. Compare the timings (for 1000 progenitors it takes apprx x seconds)
-3. For a larger # (5e4), compare visually where movements end up (histogram & raster & kernels), 
-(normalized vs. not normalized)
-4. For a wider set of options, compare distance kernels, does it do the job ok? 
-as well as proportion that end up in an empty cell or outside the district
-5. How to modify these probabilities in a regression framework ?
-
-## Options for simulating movement in simrabid
+## Comparing random & probability based movement
+- For either: 
+    - allow_empties: if TRUE, then transmission events can fail due to movement 
+      into an empty patch
+    - leave_bounds: if TRUE, then transmission events can fail due to movement 
+      outside of the district
+    - sequential: if TRUE then movements are made sequentially where N is the number 
+      of secondary cases (from 1 -> 2 -> N drawing from a distribution of step 
+      lengths); if FALSE, then movements are made like a kernel 
+      (draw N pts from the origin based on distribution) 
+- For the probability based movement: 
+    - Modify the probability of movement given a certain distance by cell covariates;
+      (this way still bounded by what you think the dispersal kernel is)
 
 ```{r}
 sd_shape <- readOGR("data/SD_shape/Serengeti_villages UTM_region.shp")
@@ -43,39 +47,59 @@ sd_shape$id_val <- as.numeric(factor(sd_shape$VILLCODE))
 rast <- setup_space(shapefile = sd_shape,
                      resolution = 1000, id_col = "id_val",
                      use_fasterize = FALSE)
-
-start_pop <- sample(500, size = ncell(rast), replace = TRUE) # fake pop
+start_pop <- rnbinom(ncell(rast), size = 1, mu = 5) # fake pop
 start_up <- setup_sim(tmax = 52*10, start_pop, rast)
-
-edges <- rasterize(sd_dissolved, rast)
-edge_ids <- which(!is.na(edges[]))
-edge_to_row <- which(edge_ids %in%  start_up$cell_ids)
 
 dispersal_fun <- function(n, params = list(disp_shape = 1.46,
                                          disp_scale = 16.1)) {
   rgamma(n, shape = params$disp_shape, scale = params$disp_scale)
 }
 
-dispersal_prob <- function(x, params = list(disp_shape = 1.46,
-                                             disp_scale = 16.1)) {
-  pgamma(x, shape = params$disp_shape, scale = params$disp_scale)
-} 
 
 ```
 
-1. Continuous space
 
+## Comparing movement simulations
+
+### Continuous probability 
+
+#### allowing for movement into empty patches)
 ```{r}
-# example
-rows <- sample(start_up$row_ids, 1000, replace = TRUE)
-t_infectious <- rep(1, 1000)
-secondaries <- rep(50, 1000)
-  
-exe_continuous <- sim_bites(secondaries = secondaries, ids = 1:1000,
+n = 1e4
+cells <- rep(2351, n) 
+origin <- data.frame(x = coordinates(rast)[2351, 1], y = coordinates(rast)[2351, 2])
+rows <- rep(start_up$row_ids[start_up$cell_ids == 2351], n) # apprx midpoint
+t_infect <- rep(1, n)
+secondaries <- rep(3, n)
+
+exe_continuous <- sim_bites(secondaries = secondaries, ids = 1:n,
                             x_coords = start_up$x_coord[rows], 
                             y_coords = start_up$y_coord[rows],
-                            t_infectious = t_infectious,
-                            counter = 1000,
+                            t_infectious = t_infect,
+                            counter = n,
+                            dispersal_fun = dispersal_fun, 
+                            res_m = start_up$res_m,
+                            row_ids = start_up$row_ids, 
+                            cell_ids = start_up$cell_ids, 
+                            cells_pop = start_up$cells_pop, nrow = start_up$nrow,
+                            ncol = start_up$ncol,
+                            x_topl = start_up$x_topl, y_topl = start_up$y_topl,
+                            sequential = TRUE, allow_empties = TRUE,
+                            leave_bounds = TRUE, max_tries = 100)
+rast_df <- as.data.frame(rast, xy = TRUE)
+rast_df$random_empties <- tabulate(exe_continuous$cell_id, nbins = ncell(rast))/nrow(exe_continuous)
+
+```
+
+#### Not allowing for movement into empty patches
+
+```{r}
+  
+exe_continuous <- sim_bites(secondaries = secondaries, ids = 1:n,
+                            x_coords = start_up$x_coord[rows], 
+                            y_coords = start_up$y_coord[rows],
+                            t_infectious = t_infect,
+                            counter = n,
                             dispersal_fun = dispersal_fun, 
                             res_m = start_up$res_m,
                             row_ids = start_up$row_ids, 
@@ -85,80 +109,175 @@ exe_continuous <- sim_bites(secondaries = secondaries, ids = 1:1000,
                             x_topl = start_up$x_topl, y_topl = start_up$y_topl,
                             sequential = TRUE, allow_empties = FALSE,
                             leave_bounds = TRUE, max_tries = 100)
+rast_df$random_noempties <- tabulate(exe_continuous$cell_id, nbins = ncell(rast))/nrow(exe_continuous)
+
+
 ```
 
+### Cell based probability
 
-2. Cell based probability
-
+#### allowing for movement into empty patches)
 ```{r}
-# example
-prob_list <- get_movemat(leave_bounds = TRUE)
-prob_list_normed <- lapply(prob_list, function(x) x/(sum(x)))
-microbenchmark::microbenchmark(
-  exe_continuous <- sim_bites(secondaries = secondaries, ids = 1:1000,
-                              x_coords = start_up$x_coord[rows], 
-                              y_coords = start_up$y_coord[rows],
-                              t_infectious = t_infectious,
-                              counter = 1000,
-                              dispersal_fun = dispersal_fun, 
-                              res_m = start_up$res_m,
-                              row_ids = start_up$row_ids, 
-                              cell_ids = start_up$cell_ids, 
-                              cells_pop = start_up$cells_pop, nrow = start_up$nrow,
-                              ncol = start_up$ncol,
-                              x_topl = start_up$x_topl, y_topl = start_up$y_topl,
-                              sequential = FALSE, allow_empties = FALSE,
-                              leave_bounds = FALSE, max_tries = 100),
-  exe_cellprob <- sim_movement_prob(secondaries = secondaries, ids = 1:1000,
-                                    rows = rows, prob_list = prob_list,
-                                    x_coords = start_up$x_coord,
-                                    y_coords = start_up$y_coord,
-                                    cell_ids = start_up$cell_ids,
-                                    t_infectious = t_infectious,
-                                    leave_bounds = FALSE,
-                                    max_to_draw = length(prob_list) + 1, 
-                                    # don't pass as argument (basically because 
-                                    # you only want to call this once! 
-                                    # so maybe just remember to set it in the simulation)
-                                    max_rows = length(start_up$row_ids),
-                                    counter = 1000, sequential = FALSE)
-)
+wts <- cell_weights(covars = list(rep(0, ncell(rast))), 
+                    params = list(0), 
+                    cells_pop = which(start_pop > 0), 
+                    allow_empties = FALSE)
+  
+# should hopefully only take a minute...
+exe_prob <- sim_movement_cells(secondaries = secondaries, ids = 1:n,
+                               x_coords = coordinates(rast)[, 1], 
+                               y_coords = coordinates(rast)[, 2], 
+                               cell_id = cells,
+                               cell_ids = start_up$cell_ids, 
+                               row_ids = start_up$row_ids,
+                               cells_pop = start_up$cells_pop,
+                               weights = wts,
+                               t_infectious = t_infect,
+                               counter = n,
+                               dispersal_fun = dispersal_fun, 
+                               res_m = start_up$res_m,
+                               nrow = start_up$nrow,
+                               ncol = start_up$ncol, ncells = ncell(rast),
+                               sequential = TRUE)
 
+rast_df$prob_noempties <- tabulate(exe_prob$cell_id, nbins = ncell(rast))/nrow(exe_prob)
+rast_df$pop <- start_pop
 ```
 
-
-## Compare the outputs 
-
+#### and modified by pop
 ```{r}
-# for each of these distribution kernels
+wts_pop <- cell_weights(covars = list(pop = start_pop, intercept = rep(1, length(start_pop))), 
+                    params = list(pop = 0.05, intercept = 0.01), 
+                    cells_pop = which(start_pop > 0), 
+                    allow_empties = TRUE)
+  
+# should hopefully only take a minute...
+exe_prob <- sim_movement_cells(secondaries = secondaries, ids = 1:n,
+                               x_coords = coordinates(rast)[, 1], 
+                               y_coords = coordinates(rast)[, 2], 
+                               cell_id = cells,
+                               cell_ids = start_up$cell_ids, 
+                               row_ids = start_up$row_ids,
+                               cells_pop = start_up$cells_pop,
+                               weights = wts_pop,
+                               t_infectious = t_infect,
+                               counter = n,
+                               dispersal_fun = dispersal_fun, 
+                               res_m = start_up$res_m,
+                               nrow = start_up$nrow,
+                               ncol = start_up$ncol, ncells = ncell(rast),
+                               sequential = TRUE)
 
-# for prob based, prob based normalized, and continous space
-
-# draw and simulate movements N times
-
-# look at which cells they end up in (with last col being those who go outside the district)
-# and also tracking for continuous movement where they go 
+rast_df$prob_pop <- tabulate(exe_prob$cell_id, nbins = ncell(rast))/nrow(exe_prob)
 
 ```
 
+## out panel figure
 ```{r}
-# for each of these distribution kernels
+rast_df %>%
+  mutate(pop = log(pop)) %>%
+  tidyr::pivot_longer(random_empties:prob_pop, names_to = "type", 
+                      values_to = "val") -> rast_long
+ggplot(filter(rast_long, type != "pop")) + 
+  geom_contour_filled(aes(x = x, y = y, z = val)) +
+  geom_point(data = origin, aes(x = x, y = y), shape = 1, stroke = 1.5) +
+  facet_wrap(~type, nrow = 1) -> tiff_comp
 
-# draw and simulate movements N times
+ggplot(filter(rast_long, type == "pop")) + 
+  geom_contour_filled(aes(x = x, y = y, z = val)) +
+  geom_point(data = origin, aes(x = x, y = y), shape = 1, stroke = 1.5) +
+  facet_wrap(~type) -> pop
 
-# look at which cells they end up in (not allowed to leave the district)
+rast_df %>%
+  tidyr::pivot_longer(c(random_empties:prob_noempties, prob_pop), names_to = "type", 
+                      values_to = "val") %>%
+  group_by(type) %>%
+  summarize(out_of_bounds = 1 - sum(val), 
+            empties = sum(val[pop == 0])) %>%
+  ggplot(aes(x = type, y = empties)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) -> out_of
 
 ```
 
+
+## Benchmarks
 ```{r}
-# for each of these distribution kernels
+n = 10
+cells <- rep(2351, n) 
+rows <- rep(start_up$row_ids[start_up$cell_ids == 2351], n) # apprx midpoint
+t_infect <- rep(1, n)
+secondaries <- rep(3, n)
+  
+comp_times <- microbenchmark::microbenchmark(
+  prob_pop = sim_movement_cells(secondaries = secondaries, ids = 1:n,
+                               x_coords = coordinates(rast)[, 1], 
+                               y_coords = coordinates(rast)[, 2], 
+                               cell_id = cells,
+                               cell_ids = start_up$cell_ids, 
+                               row_ids = start_up$row_ids,
+                               cells_pop = start_up$cells_pop,
+                               weights = wts_pop,
+                               t_infectious = t_infect,
+                               counter = n,
+                               dispersal_fun = dispersal_fun, 
+                               res_m = start_up$res_m,
+                               nrow = start_up$nrow,
+                               ncol = start_up$ncol, ncells = ncell(rast),
+                               sequential = TRUE), 
+  prob_empties = sim_movement_cells(secondaries = secondaries, ids = 1:n,
+                               x_coords = coordinates(rast)[, 1], 
+                               y_coords = coordinates(rast)[, 2], 
+                               cell_id = cells,
+                               cell_ids = start_up$cell_ids, 
+                               row_ids = start_up$row_ids,
+                               cells_pop = start_up$cells_pop,
+                               weights = wts,
+                               t_infectious = t_infect,
+                               counter = n,
+                               dispersal_fun = dispersal_fun, 
+                               res_m = start_up$res_m,
+                               nrow = start_up$nrow,
+                               ncol = start_up$ncol, ncells = ncell(rast),
+                               sequential = TRUE), 
+  random_noempties = sim_bites(secondaries = secondaries, ids = 1:n,
+                            x_coords = start_up$x_coord[rows], 
+                            y_coords = start_up$y_coord[rows],
+                            t_infectious = t_infect,
+                            counter = n,
+                            dispersal_fun = dispersal_fun, 
+                            res_m = start_up$res_m,
+                            row_ids = start_up$row_ids, 
+                            cell_ids = start_up$cell_ids, 
+                            cells_pop = start_up$cells_pop, nrow = start_up$nrow,
+                            ncol = start_up$ncol,
+                            x_topl = start_up$x_topl, y_topl = start_up$y_topl,
+                            sequential = TRUE, allow_empties = FALSE,
+                            leave_bounds = TRUE, max_tries = 100), 
+  random_empties = sim_bites(secondaries = secondaries, ids = 1:n,
+                            x_coords = start_up$x_coord[rows], 
+                            y_coords = start_up$y_coord[rows],
+                            t_infectious = t_infect,
+                            counter = n,
+                            dispersal_fun = dispersal_fun, 
+                            res_m = start_up$res_m,
+                            row_ids = start_up$row_ids, 
+                            cell_ids = start_up$cell_ids, 
+                            cells_pop = start_up$cells_pop, nrow = start_up$nrow,
+                            ncol = start_up$ncol,
+                            x_topl = start_up$x_topl, y_topl = start_up$y_topl,
+                            sequential = TRUE, allow_empties = FALSE,
+                            leave_bounds = TRUE, max_tries = 100), times = 1000)
+bench <- ggplot2::autoplot(comp_times) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-# draw and simulate movements N times
 
-# look at which cells they end up in 
+out <- tiff_comp / (pop | out_of | bench) + plot_layout(heights = c(2, 1.5))
+
+ggsave("vignettes/test.jpeg", out, width = 12, height = 10)
+
 
 ```
-
 
 
 
