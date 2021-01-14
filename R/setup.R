@@ -25,7 +25,7 @@
 #' @keywords setup
 #'
 setup_space <- function(shapefile, resolution = 1000,
-                        id_col = "VILLCODE",
+                        id_col,
                         use_fasterize = FALSE) {
 
   r <- raster(shapefile)
@@ -38,7 +38,7 @@ setup_space <- function(shapefile, resolution = 1000,
 
   } else {
 
-    if(fasterize & "sf" %in% class(shapefile) & require(fasterize)) {
+    if(use_fasterize && "sf" %in% class(shapefile) && require(fasterize)) {
       rast <- fasterize::fasterize(shapefile, r, field = id_col)
     } else {
       rast <- rasterize(shapefile, r, field = id_col)

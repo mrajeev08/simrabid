@@ -1,0 +1,164 @@
+---
+title: "Comparing movement in continuous space vs. cell based probabilities"
+author: "Malavika Rajeev"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(raster)
+library(data.table)
+library(rgdal)
+library(rmapshaper)
+library(fasterize)
+devtools::load_all()
+```
+
+## Outline
+1. Describe the two ways that you can specify movement in simrabid
+2. Compare the timings (for 1000 progenitors it takes apprx x seconds)
+3. For a larger # (5e4), compare visually where movements end up (histogram & raster & kernels), 
+(normalized vs. not normalized)
+4. For a wider set of options, compare distance kernels, does it do the job ok? 
+as well as proportion that end up in an empty cell or outside the district
+5. How to modify these probabilities in a regression framework ?
+
+## Options for simulating movement in simrabid
+
+```{r}
+sd_shape <- readOGR("data/SD_shape/Serengeti_villages UTM_region.shp")
+sd_dissolved <- as(ms_dissolve(sd_shape), "SpatialLinesDataFrame")
+sd_shape$id_val <- as.numeric(factor(sd_shape$VILLCODE))
+rast <- setup_space(shapefile = sd_shape,
+                     resolution = 1000, id_col = "id_val",
+                     use_fasterize = FALSE)
+
+start_pop <- sample(500, size = ncell(rast), replace = TRUE) # fake pop
+start_up <- setup_sim(tmax = 52*10, start_pop, rast)
+
+edges <- rasterize(sd_dissolved, rast)
+edge_ids <- which(!is.na(edges[]))
+edge_to_row <- which(edge_ids %in%  start_up$cell_ids)
+
+dispersal_fun <- function(n, params = list(disp_shape = 1.46,
+                                         disp_scale = 16.1)) {
+  rgamma(n, shape = params$disp_shape, scale = params$disp_scale)
+}
+
+dispersal_prob <- function(x, params = list(disp_shape = 1.46,
+                                             disp_scale = 16.1)) {
+  pgamma(x, shape = params$disp_shape, scale = params$disp_scale)
+} 
+
+```
+
+1. Continuous space
+
+```{r}
+# example
+rows <- sample(start_up$row_ids, 1000, replace = TRUE)
+t_infectious <- rep(1, 1000)
+secondaries <- rep(50, 1000)
+  
+exe_continuous <- sim_bites(secondaries = secondaries, ids = 1:1000,
+                            x_coords = start_up$x_coord[rows], 
+                            y_coords = start_up$y_coord[rows],
+                            t_infectious = t_infectious,
+                            counter = 1000,
+                            dispersal_fun = dispersal_fun, 
+                            res_m = start_up$res_m,
+                            row_ids = start_up$row_ids, 
+                            cell_ids = start_up$cell_ids, 
+                            cells_pop = start_up$cells_pop, nrow = start_up$nrow,
+                            ncol = start_up$ncol,
+                            x_topl = start_up$x_topl, y_topl = start_up$y_topl,
+                            sequential = TRUE, allow_empties = FALSE,
+                            leave_bounds = TRUE, max_tries = 100)
+```
+
+
+2. Cell based probability
+
+```{r}
+# example
+prob_list <- get_movemat(leave_bounds = TRUE)
+prob_list_normed <- lapply(prob_list, function(x) x/(sum(x)))
+microbenchmark::microbenchmark(
+  exe_continuous <- sim_bites(secondaries = secondaries, ids = 1:1000,
+                              x_coords = start_up$x_coord[rows], 
+                              y_coords = start_up$y_coord[rows],
+                              t_infectious = t_infectious,
+                              counter = 1000,
+                              dispersal_fun = dispersal_fun, 
+                              res_m = start_up$res_m,
+                              row_ids = start_up$row_ids, 
+                              cell_ids = start_up$cell_ids, 
+                              cells_pop = start_up$cells_pop, nrow = start_up$nrow,
+                              ncol = start_up$ncol,
+                              x_topl = start_up$x_topl, y_topl = start_up$y_topl,
+                              sequential = FALSE, allow_empties = FALSE,
+                              leave_bounds = FALSE, max_tries = 100),
+  exe_cellprob <- sim_movement_prob(secondaries = secondaries, ids = 1:1000,
+                                    rows = rows, prob_list = prob_list,
+                                    x_coords = start_up$x_coord,
+                                    y_coords = start_up$y_coord,
+                                    cell_ids = start_up$cell_ids,
+                                    t_infectious = t_infectious,
+                                    leave_bounds = FALSE,
+                                    max_to_draw = length(prob_list) + 1, 
+                                    # don't pass as argument (basically because 
+                                    # you only want to call this once! 
+                                    # so maybe just remember to set it in the simulation)
+                                    max_rows = length(start_up$row_ids),
+                                    counter = 1000, sequential = FALSE)
+)
+
+```
+
+
+## Compare the outputs 
+
+```{r}
+# for each of these distribution kernels
+
+# for prob based, prob based normalized, and continous space
+
+# draw and simulate movements N times
+
+# look at which cells they end up in (with last col being those who go outside the district)
+# and also tracking for continuous movement where they go 
+
+```
+
+```{r}
+# for each of these distribution kernels
+
+# draw and simulate movements N times
+
+# look at which cells they end up in (not allowed to leave the district)
+
+```
+
+```{r}
+# for each of these distribution kernels
+
+# draw and simulate movements N times
+
+# look at which cells they end up in 
+
+```
+
+
+
+

@@ -19,6 +19,7 @@ negbinom_constrained <- function(n, params = list(R0 = 1.2, k = 1),
 
 # dispersal function
 # defaults to Townsend et al. 2013 plos ntds
+# units = km?!
 dispersal_gamma <- function(n, params = list(disp_shape = 0.8,
                                          disp_scale = 1)) {
 
