@@ -117,14 +117,17 @@ sim_trans <- function(row_id, S, E, I, V, nlocs, track = FALSE) {
 #'   individual became infectious
 #' @param counter integer, the id number to start with for resulting secondary cases
 #' @param dispersal_fun function with a single parameter, n, which will draw distances
-#'   for each individual to move
+#'   for each individual to move in meters
 #' @param row_ids integer vector, the row ids corresponding to each grid cell in which
 #'   the infectious individual is starting from
 #' @param cell_ids integer vector, the cell ids corresponding to each grid cell in which
 #'   the infectious individual is starting from
-#' @inheritParams sim_movement
+#' @inheritParams sim_movement_continuous
+#' @inheritParams sim_movement_prob
+#' @inheritParams sim_movement_relative
+#' @param sim_movement the movement function you want to use for simulating movement, options are sim_movement_continuous, sim_movement_prob, and sim_movement_relative
 #' @param sequential boolean, if TRUE then movements are sequential, if FALSE, then
-#'   movements are kernel based (see Details)
+#'   movements are kernel based; for movement_fun, the outputwill be a list if sequential and a data.table if not sequential
 #' @inheritParams accept
 #' @param max_tries integer, the maximum number of tries to make before accepting
 #'   an invalid movement (i.e. transmission event fails due to either leaving the
@@ -137,14 +140,17 @@ sim_trans <- function(row_id, S, E, I, V, nlocs, track = FALSE) {
 #' @keywords transmit internal
 #'
 sim_bites <- function(secondaries, ids = I_now$id,
-                      x_coords = I_now$x_coord, y_coords = I_now$y_coord,
+                      x_coords = I_now$x_coord,
+                      y_coords = I_now$y_coord,
                       t_infectious = I_now$t_infectious,
                       counter = max(I_dt$id),
+                      sim_movement = sim_movement_continuous,
                       dispersal_fun, res_m,
                       row_ids, cell_ids, cells_pop, nrow, ncol,
                       x_topl, y_topl,
+                      weights = NULL, admin_id = NULL,
                       sequential = TRUE, allow_empties = TRUE,
-                      leave_bounds = TRUE, max_tries = 100) {
+                      leave_bounds = TRUE, max_tries = 100, ...) {
 
   # just use rep(.I situation to replicate?) (see how it does vs. multiple reps)
   progen_ids <- rep(ids, secondaries)
@@ -169,149 +175,61 @@ sim_bites <- function(secondaries, ids = I_now$id,
         path <- path + 1
       }
 
-      accept <- 0
-      tries <- 0
-      while (!accept & tries < max_tries) {
-
-        move <- sim_movement(angle = runif(n = 1, min = 0, max = 2*pi),
-                             distance = dispersal_fun(1),
-                             x0 = x, y0 = y, x_topl,
-                             y_topl, res_m, ncol,
-                             nrow, cells_pop, path)
-        accept <- accept(leave_bounds, allow_empties, move$within,
-                         move$populated)
-
-        tries <- tries + 1
+      out[[i]] <- sim_movement(dispersal_fun,
+                           x0 = x, y0 = y, x_topl,
+                           y_topl, res_m, ncol,
+                           nrow, cells_pop, path,
+                           leave_bounds, allow_empties, max_tries,
+                           sequential)
 
       }
-      out[[i]] <- move
-    }
 
     out <- rbindlist(out)
 
+    # getting coords of grid centroid here vectorized!
+
   } else {
 
-    nmoves <- sum(secondaries)
-
-    # get origin from infector if kernel movements
-    out <- as.data.table(
-      sim_movement(
-        angle = runif(n = nmoves, min = 0, max = 2*pi),
-        distance = dispersal_fun(nmoves),
-        x0 = origin_x, y0 = origin_y, x_topl,
-        y_topl, res_m, ncol,
-        nrow, cells_pop, path = 0)
-      ) # not sequential
-
-    accept <- accept(leave_bounds, allow_empties, within = out$within,
-                     populated = out$populated)
-
-    tries <- 0
-    while(sum(!accept) > 0 & tries < max_tries) {
-
-      out[!accept, ] <-
-        as.data.table(
-          sim_movement(angle = runif(n = sum(!accept), min = 0, max = 2*pi),
-                     distance = dispersal_fun(sum(!accept)),
-                     x0 = origin_x[!accept], y0 = origin_y[!accept],
-                     x_topl, y_topl, res_m, ncol, nrow, cells_pop,
-                     path = 0L))
-
-      accept <- accept(leave_bounds, allow_empties, within = out$within,
-                       populated = out$populated)
-
-      tries <- tries + 1
-    }
+  out <- sim_movement(dispersal_fun, x0 = origin_x, y0 = origin_y, x_topl,
+                      y_topl, res_m, ncol, nrow, cells_pop, path = 0,
+                      leave_bounds, allow_empties, max_tries,
+                      sequential)
   }
+
   # add in ids
   out$id <- counter + 1:length(progen_ids)
   out$progen_id <- progen_ids
   out$t_infected <- rep(t_infectious, secondaries) # tstep became infected
-  out$row_id <- row_ids[match(out$cell_id, cell_ids)] # row ids to match to I/E mats
   out$contact <- "M"
   out$infected <- FALSE
+
+  if(!is.null(admin_id)) {
+    out$cell_id <- cell_to_admin(out$cell_id, admin_id)
+  }
+
+  # row ids to match to I/E mats (either corresponding to admin unit or cells)
+  out$row_id <- row_ids[match(out$cell_id, cell_ids)]
+
   return(out)
-}
-
-#' Simulate individual movements
-#'
-#' Simulates movemement of individuals in continuous space.
-#'
-#' This simulates movement and uses the top-left coordinates and 1-based indexing
-#' of raster cell ids to identify the grid cell moved to by an individual.
-#'
-#' @param angle numeric vector [0, 360] or value, angle at which to move at
-#' @param distance numeric vector or value, distance to move
-#' @param x0 numeric vector or value, the x origin of the infected individual
-#' @param y0 numeric vector or value, the y origin of the infected individual
-#' @param x_topl numeric, the top left x coordinate of the grid on which
-#'   movement is being simulated
-#' @param y_topl numeric, the top left y coordinate of the grid on which
-#'   movement is being simulated
-#' @param res_m numeric, the grid cell resolution in meters
-#' @param ncol numeric, the number of columns in the grid
-#' @param nrow numeric, the number of rows in the grid
-#' @param cells_pop integer vector, the cell ids of grid cells that are populated
-#'   or generally where movements are valid to
-#' @param path integer vector or value, if sequential is FALSE then 0, if TRUE then
-#'  the path id (i.e. which step of the movements) to pass through and assign to exposed
-#'
-#' @return a list with the resulting x and y coordinates, cell ids, whether
-#'   the movement was to a populated cell, whether the movement fell within the bounds
-#'   of the simulation, and the path id for the exposed.
-#' @keywords transmit internal
-#'
-sim_movement <- function(angle, distance, x0, y0, x_topl,
-                         y_topl, res_m, ncol, nrow, cells_pop,
-                         path) {
-
-  x_coord <- (sin(angle) * distance * 1000) + x0 # convert to m
-  y_coord <- (cos(angle) * distance * 1000) + y0
-
-  # This means can go anywhere
-  col <- ceiling((x_coord - x_topl)/res_m)
-  row <- ceiling(-(y_coord - y_topl)/res_m)
-  cell_id <- row*ncol - (ncol - col)
-  populated <- cell_id %in% cells_pop
-  within <- row > 0 & row <= nrow & col > 0 & col <= ncol
-
-  # return(data.table(x_coord, y_coord, cell_id, populated, within, path))
-
-  return(list(x_coord = x_coord,
-              y_coord = y_coord, cell_id = cell_id,
-              populated = populated, within = within, path = path))
 
 }
 
-#' Accept a simulated movement
-#'
-#' Helper function to determine if a simulated movement is valid.
-#' To do: tests (same length as within and boolean no NAs)
-#'
-#' @param leave_bounds boolean, are movements to outside of the boundaries of the are being
-#'   simulated valid
-#' @param allow_empties boolean, are movements to empty patches (i.e. with no dogs) valid
-#' @param within boolean vector, whether movement falls within bounds
-#' @param populated boolean vector, whether movement falls within a populated area
-#'
-#' @return a boolean vector of length `within`/`populated` corresponding to whether
-#'   a movement is accepted as valid
-#'
-#' @keywords transmit internal
-#'
-accept <- function(leave_bounds, allow_empties,
-                   within, populated) {
+# want to do this vectorized @ the end
+cell_to_admin <- function(cell_id, admin_id) {
 
-  accept <- rep(1, length(within))
+  return(admin_id[cell_id])
 
-  if(!leave_bounds) {
-    accept <- ifelse(within, 1, 0)
-  }
+}
 
-  if(!allow_empties) {
-    accept <- ifelse(populated, 1, 0)
-  }
+# getting cellid
+get_cellid <- function(x_coord, y_coord, res_m, x_topl, y_topl,
+                       ncol, nrow) {
 
-  return(accept)
+  col <- ceiling((x_coord - x_topl) / res_m)
+  row <- ceiling(-(y_coord - y_topl) / res_m)
+  cell_id <- row * ncol - (ncol - col)
+
+  return(cell_id)
+
 }
 
