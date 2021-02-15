@@ -1,16 +1,72 @@
 sim_movement_prob <-
-  function(dispersal_fun, x0, y0, x_topl,
-           y_topl, res_m, ncol, nrow, cells_pop, path,
-           leave_bounds, allow_empties, max_tries, sequential, weights,
-           ...) {
+  function(dist_m, dispersal_fun, x0, y0, x_topl,
+           y_topl, res_m, ncol, nrow, cells_block, cells_out_bounds, path,
+           leave_bounds, allow_invalid, max_tries, sequential, weights, ...) {
 
-    # get x_coords from indexing (at end add list element rather than within the loop!
-    # this as an if statement into bigger movement fun?)
 
-    # list of one if sequential or as.data.table if not sequential
-    return(list(x_coord = x_coord,
-                y_coord = y_coord, cell_id = cell_id,
-                populated = populated, within = within, path = path))
+    if(sequential) {
+
+      accept <- 0
+      tries <- 0
+
+      while (!accept & tries < max_tries) {
+
+        if(tries = 0) {
+          dist_now <- dist_m
+        } else {
+          dist_now <- dispersal_fun(1)
+        }
+
+        out <- movement_prob(dist_m = dist_now, weights, x0, y0, x_topl, y_topl, ncell,
+                             res_m, ncol, nrow, path,
+                             leave_bounds, cells_block,
+                             cells_out_bounds)
+
+        accept <- accept(leave_bounds, allow_invalid, outbounds = out$outbounds,
+                         invalid = out$invalid)
+
+        tries <- tries + 1
+      }
+
+    } else {
+
+      out <- vector("list", length(dist_m))
+
+      for (i in 1:length(out)) {
+
+        accept <- 0
+        tries <- 0
+
+        while (!accept & tries < max_tries) {
+
+          if(tries = 0) {
+            dist_now <- dist_m[i]
+          } else {
+            dist_now <- dispersal_fun(1)
+          }
+
+          out_i <- movement_prob(dist_m = dist_now, weights, x0 = x0[i],
+                                 y0 = x0[i], x_topl, y_topl, ncell,
+                                 res_m, ncol, nrow, path,
+                                 leave_bounds, cells_block,
+                                 cells_out_bounds)
+
+          accept <- accept(leave_bounds, allow_invalid, outbounds = out_i$outbounds,
+                           invalid = out_i$invalid)
+
+          tries <- tries + 1
+        }
+
+        out[[i]] <- out_i
+
+      }
+
+      out <- rbindlist(out)
+
+
+    }
+
+    return(out)
 
 }
 
@@ -34,65 +90,98 @@ cells_away <- function(x0, y0, dist_m, res_m, ncol, nrow,
   # Get cell ids
   cell_id <- get_cellid(x_coord, y_coord, res_m, x_topl, y_topl, ncol, nrow)
 
-  return(cell_id)
+  return(list(cell_id = cell_id, x_coord = x_coord, y_coord = y_coord))
 
 }
 
 # only need to do this once for each parameter set!
-# one covar needs to be 1 and one of the params needs to be beta_0
+# one param needs to be intercept, i.e. beta_0 (where covar = 1)
 # covars if weighted need to be the length of ncells
+# tricky for leave bounds because if true and weighted then you need to
+# decide what the proabibility is that doggoes leave the bounds
 cell_weights <- function(covars = list(0),
-                         params = list(0)) {
+                         params = list(0),
+                         ncell,
+                         leave_bounds,
+                         allow_invalid,
+                         cells_block,
+                         cells_out_bounds) {
 
-  # convert to value between 0 - 1
+  # convert to value between 0 - 1 (defaults to weights of all = 0.5)
   weights <- plogis(Reduce('+', Map('*', covars, params)))
+
+  if(length(weights) == 1) {
+    weights <- rep(weights, ncell)
+  }
+
+  if(!allow_invalid) {
+    weights[cells_block] <- 0
+  }
+
+  if(!leave_bounds) {
+    weights[cells_out_bounds] <- 0
+    # For those that fall outside of all possible cells, set to zero
+    weights <- c(weights, 0)
+  } else {
+    # If outside movements are allowed
+    # For those that fall outside of all possible cells, set to min non zero
+    weights <- c(weights, min(weights[weights > 0]))
+  }
+
+
+  if(length(weights) != ncell + 1) {
+    stop("Cell weights length should be ncell(rast) + 1!")
+  }
+
 
   return(weights)
 
 }
 
-# get cell weights for given cell ids accounting for
-get_weights <- function(covars = list(0),
-                         params = list(0)) {
+# get cell weights
+# dealing with ones that actually are outside of all cells!
+get_cellweights <- function(weights, cell_ids) {
 
-  # convert to value between 0 - 1
-  weights <- plogis(Reduce('+', Map('*', covars, params)))
+  cell_ids[cell_ids < 0] <- length(weights) # means not inside possible cells
+  weights <- weights[cell_ids]
 
   return(weights)
 
 }
 
-movement_prob <- function(dispersal_fun,
+# Movement based on probability
+movement_prob <- function(dist_m,
                           weights, x0, y0, x_topl, y_topl,
-                          res_m, ncol, nrow, cells_pop, cells_in_bounds,
-                          sequential,
-                          allow_empties, leave_bounds, path) {
+                          ncell,
+                          res_m, ncol, nrow, path,
+                          leave_bounds, cells_block,
+                          cells_out_bounds) {
 
-  # need to handle length of x0 in here as well and sequential in here
-
-  # draw distance
-  dist_m <- dispersal_fun(1)
-
+  # Options for movement at distance x (should handle weights at the top)
+  # Should return a list!
   opts <- cells_away(x0, y0, dist_m, res_m, ncol, nrow, x_topl, y_topl)
-  populated <- opts %in% cells_pop
-  within <- opts %in% cells_in_bounds
 
-  accept <- accept(leave_bounds, allow_empties, within = within,
-                   populated = populated)
-  # choose a cell id based on weights
+  # Get the weights for each cell id
+  weights <- get_cellweights(weights, cell_ids)
 
-  # Get cell id
-  cell_id <- get_cellid(x_coord, y_coord, res_m, x_topl, y_topl, ncol, nrow)
-  populated <- cell_id %in% cells_pop
-  within <- row > 0 & row <= nrow & col > 0 & col <= ncol
+  # Pick the cell to move to based on probabilities
+  opt_n <- length(opts$cell_id)
 
-  return(list(x_coord = x_coord,
-              y_coord = y_coord, cell_id = cell_id,
-              populated = populated, within = within, path = path))
+  if(opt_n == 1) { # if only one option, then return that option
+    out <- opts
+  } else {
+    if(sum(weights) == 0) { # if all weights == 0, don't do prob
+      out <- transpose(opts)[[sample(opt_n, size = 1)]]
+    } else {
+      out <- transpose(opts)[[sample(opt_n, size = 1, prob = weights)]]
+    }
+  }
+
+  out$invalid <- out$cell_id %in% cells_block
+  out$outbounds <- !(out$cell_id %in% 1:ncell) | out$cell_id %in% cells_out_bounds
+  out$path <- path
+
+  return(out)
 
 }
-
-
-
-
 

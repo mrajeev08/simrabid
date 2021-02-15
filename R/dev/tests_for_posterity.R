@@ -91,3 +91,4 @@ num = rnorm(100, 10)
 
 microbenchmark(ifelse(dist, "what", "nope"),
                ifelse(num < 10, "what", "nope"))
+

@@ -101,7 +101,7 @@ sim_trans <- function(row_id, S, E, I, V, nlocs, track = FALSE) {
 #' or can be kernel based where movements are all seeded from
 #' the origin location of the infected individual. Movements outside of the bounds
 #' of the simulation or to uninhabitable grid cells can either be accepted (if
-#' `leave_bounds` or `allow_empties` are `TRUE`). If `FALSE`, these movements will not be
+#' `leave_bounds` or `allow_invalid` are `TRUE`). If `FALSE`, these movements will not be
 #' accepted and will be redrawn `max_tries` times.
 #'
 #' To Do:
@@ -132,7 +132,7 @@ sim_trans <- function(row_id, S, E, I, V, nlocs, track = FALSE) {
 #' @param max_tries integer, the maximum number of tries to make before accepting
 #'   an invalid movement (i.e. transmission event fails due to either leaving the
 #'   bounds of the simulation or moving to an uninhabitable grid cell) if either
-#'   or both leave_bounds and allow_empties are FALSE.
+#'   or both leave_bounds and allow_invalid are FALSE.
 #'
 #' @import data.table
 #' @return a data.table that corresponds to the columns in I_dt in the simulation.
@@ -146,23 +146,27 @@ sim_bites <- function(secondaries, ids = I_now$id,
                       counter = max(I_dt$id),
                       sim_movement = sim_movement_continuous,
                       dispersal_fun, res_m,
-                      row_ids, cell_ids, cells_pop, nrow, ncol,
+                      row_ids, cell_ids, cells_block, cells_out_bounds,
+                      nrow, ncol, ncell,
                       x_topl, y_topl,
                       weights = NULL, admin_id = NULL,
-                      sequential = TRUE, allow_empties = TRUE,
+                      sequential = TRUE, allow_invalid = TRUE,
                       leave_bounds = TRUE, max_tries = 100, ...) {
 
   # just use rep(.I situation to replicate?) (see how it does vs. multiple reps)
   progen_ids <- rep(ids, secondaries)
   origin_x <- rep(x_coords, secondaries)
   origin_y <- rep(y_coords, secondaries)
+  nsim <- length(progen_ids)
+  dist_m <- dispersal_fun(nsim)
+  angles <- angle_fun(nsim)
 
   if(sequential) {
 
     # first movement index of each progenitor
     inds <- match(ids, progen_ids) # returns first match of id in progen id
     inds <- inds[!is.na(inds)]
-    out <- vector("list", length(progen_ids))
+    out <- vector("list", nsim)
 
     for (i in seq_along(progen_ids)) {
       if (i %in% inds) { # need progenitor coords for 1st movement
@@ -175,12 +179,15 @@ sim_bites <- function(secondaries, ids = I_now$id,
         path <- path + 1
       }
 
-      out[[i]] <- sim_movement(dispersal_fun,
-                           x0 = x, y0 = y, x_topl,
-                           y_topl, res_m, ncol,
-                           nrow, cells_pop, path,
-                           leave_bounds, allow_empties, max_tries,
-                           sequential)
+      out[[i]] <- sim_movement(dist_m = dist_m[i],
+                               angle = angles[i],
+                               dispersal_fun,
+                               x0 = x, y0 = y, x_topl,
+                               y_topl, res_m, ncol,
+                               nrow, ncell,
+                               cells_block, cells_out_bounds, path,
+                               leave_bounds, allow_invalid, max_tries,
+                               sequential)
 
       }
 
@@ -190,14 +197,19 @@ sim_bites <- function(secondaries, ids = I_now$id,
 
   } else {
 
-  out <- sim_movement(dispersal_fun, x0 = origin_x, y0 = origin_y, x_topl,
-                      y_topl, res_m, ncol, nrow, cells_pop, path = 0,
-                      leave_bounds, allow_empties, max_tries,
+  out <- sim_movement(dist_m = dist_m,
+                      angle = angles,
+                      dispersal_fun,
+                      x0 = origin_x, y0 = origin_y, x_topl,
+                      ncell,
+                      y_topl, res_m, ncol, nrow, cells_block, cells_out_bounds,
+                      path = 0,
+                      leave_bounds, allow_invalid, max_tries,
                       sequential)
   }
 
   # add in ids
-  out$id <- counter + 1:length(progen_ids)
+  out$id <- counter + 1:nsim
   out$progen_id <- progen_ids
   out$t_infected <- rep(t_infectious, secondaries) # tstep became infected
   out$contact <- "M"

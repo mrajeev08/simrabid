@@ -66,23 +66,24 @@ setup_space <- function(shapefile, resolution = 1000,
 #'
 setup_sim <- function(tmax, start_pop, rast) {
 
-  inds <- !is.na(rast[]) & !is.na(start_pop)
-  cell_ids <- (1:ncell(rast))[inds]
-  loc_ids <- rast[inds]
+  # cells to block / not track
+  all_inds <- block_cells(rast, start_pop)
+
+  # only tracking populated cells within district (no new pops in new cells)
+  cell_ids <- all_inds$track_inds
+  loc_ids <- rast[cell_ids]
   nlocs <- length(cell_ids)
-  coords <- raster::coordinates(rast)[inds, ]
-  start_pop <- start_pop[inds]
+  coords <- raster::coordinates(rast)[cell_ids, ]
+  start_pop <- start_pop[cell_ids]
 
   # state matrices
-  row_ids <- 1:nlocs # don't need to do this function call each time either
+  row_ids <- 1:nlocs
   S_mat <- V_mat <- N_mat <- I_mat <- E_mat <- matrix(0L, nrow = nlocs, ncol = tmax)
-  rows_pop <- row_ids[start_pop > 0]
-  cells_pop <- cell_ids[start_pop > 0]
 
   # Set up I_dt (data table)
   I_dt <- data.table(id = 0, cell_id = 0, row_id = 0,
                      progen_id = 0, path = 0L, x_coord = 0,
-                     y_coord = 0, populated = FALSE, within = FALSE,
+                     y_coord = 0, invalid = TRUE, outbounds = TRUE,
                      t_infected = 0, contact = "N",
                      infected = FALSE, t_infectious = 0)
 
@@ -92,8 +93,10 @@ setup_sim <- function(tmax, start_pop, rast) {
 
   return(list(row_ids = row_ids, S_mat = S_mat, I_mat = I_mat, E_mat = E_mat,
               V_mat = V_mat, N_mat = N_mat, cell_ids = cell_ids,
-              cells_pop = cells_pop, rows_pop = rows_pop, I_dt = I_dt,
-              empty_dt = empty_dt, nlocs = nlocs, loc_ids = loc_ids,
+              cells_block = all_inds$block_inds,
+              cells_out_bounds = all_inds$out_inds,
+              I_dt = I_dt, empty_dt = empty_dt, nlocs = nlocs,
+              loc_ids = loc_ids,
               start_pop = start_pop,
               nrow = nrow(rast),
               ncol = ncol(rast),
@@ -110,8 +113,7 @@ setup_sim <- function(tmax, start_pop, rast) {
 #' @keywords internal
 #' @import data.table
 #'
-init <- function(start_pop, start_vacc, I_seeds, I_dt,
-                 rows_pop, cell_ids, nlocs,
+init <- function(start_pop, start_vacc, I_seeds, I_dt, cell_ids, nlocs,
                  x_coord, y_coord) {
 
   # Starting pop + sus
@@ -124,13 +126,13 @@ init <- function(start_pop, start_vacc, I_seeds, I_dt,
   S <- start_pop - V
 
   # Seed cases at t0 and create data.table
-  row_id <- sample(rows_pop, I_seeds, replace = TRUE)
+  row_id <- sample(nlocs, I_seeds, replace = TRUE)
 
   I_init <- data.table(id = 1:I_seeds, cell_id = cell_ids[row_id],
                       row_id, progen_id = 0, path = 0L,
                       x_coord = x_coord[row_id],
                       y_coord = y_coord[row_id],
-                      populated = TRUE, within = TRUE,
+                      invalid = TRUE, outbounds = TRUE,
                       t_infected = 0, contact = "N",
                       infected = TRUE,
                       t_infectious = 1)
@@ -151,10 +153,28 @@ init <- function(start_pop, start_vacc, I_seeds, I_dt,
 double_I <- function(I_dt) {
   I_skeleton <- data.table(id = 0, cell_id = 0, row_id = 0,
                            progen_id = 0, path = 0L, x_coord = 0,
-                           y_coord = 0, populated = FALSE, within = FALSE,
+                           y_coord = 0, invalid = TRUE, outbounds = TRUE,
                            t_infected = 0, contact = "N",
                            infected = FALSE, t_infectious = 0)
 
   I_dt <- rbind(I_dt, I_skeleton[rep(I_skeleton[, .I], nrow(I_dt))])
   return(I_dt)
 }
+
+# block cells function
+# option to write your own function that decides which cells
+# you want to block movements to
+block_cells <- function(rast, start_pop) {
+
+  in_inds <- which(!is.na(rast[]))
+  out_inds <- which(is.na(rast))
+  no_pop <- which(start_pop < 1)
+  block_inds <- no_pop[no_pop %in% in_inds]
+
+  # Ones to track: inside district & unblocked
+  track_inds <- which(!is.na(rast[] & start_pop > 0))
+
+  return(list(block_inds = block_inds, out_inds = out_inds,
+              track_inds = track_inds))
+}
+

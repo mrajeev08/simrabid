@@ -38,4 +38,7 @@ the same @ fine scales)(vignette)
 - Limit ifelse statements
 - Store things as integers where possible
 
+## Known limitations / potential extensions
+- Doesn't simulate expansion of occupied cells (i.e. colonization of patches by doggos)
+- Carrying capacity for growth
 

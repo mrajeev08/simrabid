@@ -85,9 +85,9 @@ sim_movement_prob <- function(secondaries, ids, rows, prob_list,
   }
 
   if(leave_bounds) {
-    within <- fifelse(out > max_rows, FALSE, TRUE)
+    outbounds <- fifelse(out > max_rows, TRUE, FALS)
   } else {
-    within <- TRUE
+    outbounds <- FALSE
   }
 
   out <- data.table(id = counter + 1:length(progen_ids),
@@ -96,7 +96,7 @@ sim_movement_prob <- function(secondaries, ids, rows, prob_list,
                     x_coord = x_coords[out],
                     y_coord = y_coords[out],
                     progen_ids, path,
-                    within,
+                    invalid = FALSE, outbounds,
                     t_infected = rep(t_infectious, secondaries),
                     contact = "M",
                     infected = FALSE)

@@ -10,7 +10,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                      dispersal_fun = dispersal_gamma,
                      secondary_fun = negbinom_constrained,
                      incursion_fun = sim_incursions_pois,
-                     sequential = TRUE, allow_empties = TRUE,
+                     sequential = TRUE, allow_invalid = TRUE,
                      leave_bounds = TRUE, max_tries = 100,
                      summary_funs = list(return_env = return_env),
                      track = TRUE,
@@ -22,10 +22,8 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
   list2env(start_up, envir = environment())
 
   # initialize vaccination & infection
-  list2env(init(start_pop = start_pop, start_vacc = start_vacc,
-                I_seeds = I_seeds, I_dt = I_dt,
-                rows_pop = rows_pop, cell_ids = cell_ids, nlocs = nlocs,
-                x_coord = x_coord, y_coord = y_coord), envir = environment())
+  list2env(init(start_pop, start_vacc, I_seeds, I_dt, cell_ids, nlocs,
+                x_coord, y_coord), envir = environment())
 
   list2env(vacc_dt, envir = environment()) # spit out data table into environment
 
@@ -65,7 +63,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
 
     # Transmission ----
     # incursions
-    incs <- incursion_fun(nlocs, rows_pop, params)
+    incs <- incursion_fun(nlocs, params)
 
     if(sum(incs) > 0) {
 
@@ -99,30 +97,32 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                            t_infectious = I_now$t_infectious,
                            counter = max(I_dt$id),
                            dispersal_fun, res_m,
-                           row_ids, cell_ids, cells_pop, nrow, ncol,
+                           row_ids, cell_ids,
+                           cells_block, cells_out_bounds, ncells,
+                           nrow, ncol,
                            x_topl, y_topl,
-                           sequential, allow_empties,
+                           sequential, allow_invalid,
                            leave_bounds, max_tries)
 
-      # this should only be for ones that were successfully (i.e. within & populated)
-      exp_inds <- exposed$populated & exposed$within
+      # this should only be for ones that were successful (i.e. within & populated)
+      exp_inds <- !exposed$invalid & !exposed$outbounds
       out <- sim_trans(row_id = exposed$row_id[exp_inds],
                        S, E, I, V, nlocs,
                        track)
       exposed$contact[exp_inds] <- out$contact
       exposed$infected[exp_inds] <- out$infected
 
-      # were those contacts with a susceptible?
+      # were those contacts with a susceptible?  (better way to do this)
       exposed$t_infectious <- 0
-      exposed$t_infectious[exposed$infected] <- t_infectious(n = length(exposed$t_infectious[exposed$infected]),
-                                                             t_infected = exposed$t_infected[exposed$infected],
-                                                             days_in_step,
-                                                             generation_fun)
+      exposed$t_infectious[exposed$infected] <-
+        t_infectious(n = length(exposed$t_infectious[exposed$infected]),
+                     t_infected = exposed$t_infected[exposed$infected],
+                     days_in_step, generation_fun)
 
-      # Make sure colum order matches that of I_dt
+      # Make sure colum order matches that of I_dt (better way to do this)
       setcolorder(exposed, c('id', 'cell_id', 'row_id', 'progen_id',
-                             'path', 'x_coord', 'y_coord', 'populated',
-                             'within', 't_infected', 'contact', 'infected',
+                             'path', 'x_coord', 'y_coord', 'invalid',
+                             'outbounds', 't_infected', 'contact', 'infected',
                              't_infectious'))
 
       # if not tracking outcomes, then only track infected
@@ -162,8 +162,8 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     V_mat[, t] <- V
   }
 
-  # Reporting model (adds a reported column to the I data.table)
-  reporting_fun(I_dt) # change this so it operates within data.table
+  # Reporting model (adds a reported column to the I data.table) (modifies in place!)
+  reporting_fun(I_dt) # change this so it operates within data.table?
 
   # Summary functions which returns list of objs (or list of lists)
   out <- lapply(summary_funs, function(x) x())
