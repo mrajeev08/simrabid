@@ -280,4 +280,6 @@ ggsave("vignettes/test.jpeg", out, width = 12, height = 10)
 ```
 
 
+# Roadmap
 
+- Relative probabilities (i.e. call them from a list of probs, i.e. for landscape barriers)

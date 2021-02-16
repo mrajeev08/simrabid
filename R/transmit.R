@@ -153,13 +153,13 @@ sim_bites <- function(secondaries, ids = I_now$id,
                       sequential = TRUE, allow_invalid = TRUE,
                       leave_bounds = TRUE, max_tries = 100, ...) {
 
-  # just use rep(.I situation to replicate?) (see how it does vs. multiple reps)
+  # set up
   progen_ids <- rep(ids, secondaries)
   origin_x <- rep(x_coords, secondaries)
   origin_y <- rep(y_coords, secondaries)
   nsim <- length(progen_ids)
   dist_m <- dispersal_fun(nsim)
-  angles <- angle_fun(nsim)
+  if(is.null(weights))  angles <- NULL else angles <- angle_fun(nsim)
 
   if(sequential) {
 
