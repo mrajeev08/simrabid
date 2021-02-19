@@ -1,3 +1,81 @@
+---
+title: "Getting started with simrabid"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with simrabid}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(simrabid)
+
+# synthetic example
+library(raster)
+library(data.table)
+library(rgdal)
+library(Matrix)
+library(rmapshaper)
+devtools::load_all()
+
+expand.grid(sequential = c(TRUE, FALSE), allow_invalid = c(TRUE, FALSE),
+            leave_bounds = c(TRUE, FALSE), track = c(TRUE, FALSE),
+            resolution = c(1000, 2000, 4000))
+
+sd_shape <- readOGR("data/SD_shape/Serengeti_villages UTM_region.shp")
+sd_dissolved <- as(ms_dissolve(sd_shape), "SpatialLinesDataFrame")
+rast <- setup_space(shapefile = sd_shape,
+                     resolution = 1000, id_col = "VILLCODE",
+                     use_fasterize = FALSE)
+
+start_pop <- sample(500, size = ncell(rast), replace = TRUE) # fake pop
+start_up <- setup_sim(tmax = 52*10, start_pop, rast)
+
+edges <- rasterize(sd_dissolved, rast)
+edge_ids <- which(!is.na(edges[]))
+edge_to_row <- which(edge_ids %in%  start_up$cell_ids)
+
+vacc_dt <- sim_campaigns(locs = 1:max(rast[], na.rm = TRUE),
+                         campaign_prob = 0,
+                         coverage = 0,
+                         sim_years = 8, burn_in_years = 2,
+                         steps_in_year = 52,
+                         sample_tstep = function(n) sample.int(52, n, replace = TRUE))
+
+# Test the following args below
+# Sequential
+# Allow empties
+# Track
+for(i in 1:10) {
+  out <- simrabid(start_up, start_vacc = 0.2, I_seeds = 5, vacc_dt,
+                  params = list(R0 = 1.5, k = 100, iota = 4),
+                  death_prob = get_prob(rate = 0.48, step = 52), # annual death rate to prob
+                  waning_prob = get_prob(rate = 1/3, step = 52), # annual waning to prob
+                  birth_prob = get_prob(rate = 0.52, step = 52), # annual birth rate to prob
+                  days_in_step = 7, # get tmax from start up!
+                  generation_fun = gen_gamma,
+                  dispersal_fun = dispersal_gamma,
+                  secondary_fun = negbinom_constrained,
+                  incursion_fun = sim_incursions_pois,
+                  reporting_fun = binom_detect,
+                  sequential = TRUE, allow_invalid = FALSE,
+                  leave_bounds = TRUE, max_tries = 5,
+                  summary_funs = list(use_mget = use_mget),
+                  track = FALSE,
+                  row_probs = NULL)
+}
+
+
+# Also test if changing scales works
+
+# Also test if changing functions works
 # Figure for hdsi application
 
 # synthetic example
@@ -164,3 +242,4 @@ bottomrow <- mapped | ts | tree
 # figure 1
 fig1 <- toprow / bottomrow
 ggsave("vignettes/hdsi_fig.jpeg", fig1, width = 7, height = 5)
+```

@@ -16,7 +16,9 @@
 #' @param row_id numeric vector (length >= 1) the row ids corresponding to the grid cell of the exposure (one value per exposure)
 #' @param S,E,I,V numeric vector of state variables (i.e. # of individuals in
 #'   each class in each grid cell) of length nlocs
-#' @param nlocs numeric, number of grid cells total
+#' @param bins numeric, either the number of grid cells total OR
+#'  the number of admin units, for when simulating at admin rather
+#'  than grid cell level
 #' @param track boolean, whether to explicitly track the outcome of each exposure or
 #'   to only track whether successful or not (i.e. with a suscpetible or no). See details.
 #'
@@ -24,9 +26,9 @@
 #'  contact will be NULL if track = FALSE.
 #' @keywords transmit internal
 #'
-sim_trans <- function(row_id, S, E, I, V, nlocs, track = FALSE) {
+sim_trans <- function(row_id, S, E, I, V, bins, track = FALSE) {
 
-  exps <- tabulate(row_id, nbins = nlocs)
+  exps <- tabulate(row_id, nbins = bins)
   id_list <- which(exps > 0)
   nexps <- length(row_id)
 
@@ -122,13 +124,15 @@ sim_trans <- function(row_id, S, E, I, V, nlocs, track = FALSE) {
 #'   the infectious individual is starting from
 #' @param cell_ids integer vector, the cell ids corresponding to each grid cell in which
 #'   the infectious individual is starting from
-#' @inheritParams sim_movement_continuous
-#' @inheritParams sim_movement_prob
-#' @inheritParams sim_movement_relative
-#' @param sim_movement the movement function you want to use for simulating movement, options are sim_movement_continuous, sim_movement_prob, and sim_movement_relative
-#' @param sequential boolean, if TRUE then movements are sequential, if FALSE, then
-#'   movements are kernel based; for movement_fun, the outputwill be a list if sequential and a data.table if not sequential
+#' @param sim_movement the movement function you want to use for simulating movement, options are sim_movement_continuous and sim_movement_prob (pass this through \code{\link{simrabid}})
 #' @inheritParams accept
+#' @inheritParams sim_movement_continuous
+#' @param weights numeric vector, weights to give each grid cell for sampling moves
+#'  for use with sim_movement_prob; will be length ncell + 1,
+#'  see \code{\link{cell_weights}}) for more details.
+#' defaults to NULL
+#' @param admin_ids if aggregating by the administrative unit (rather than grid cell), pass the rasterized
+#' administrative ids for each cell
 #' @param max_tries integer, the maximum number of tries to make before accepting
 #'   an invalid movement (i.e. transmission event fails due to either leaving the
 #'   bounds of the simulation or moving to an uninhabitable grid cell) if either
@@ -137,7 +141,7 @@ sim_trans <- function(row_id, S, E, I, V, nlocs, track = FALSE) {
 #' @import data.table
 #' @return a data.table that corresponds to the columns in I_dt in the simulation.
 #' See \code{\link{simrabid}} for full description.
-#' @keywords transmit internal
+#' @keywords move internal
 #'
 sim_bites <- function(secondaries, ids = I_now$id,
                       x_coords = I_now$x_coord,
@@ -149,7 +153,7 @@ sim_bites <- function(secondaries, ids = I_now$id,
                       row_ids, cell_ids, cells_block, cells_out_bounds,
                       nrow, ncol, ncell,
                       x_topl, y_topl,
-                      weights = NULL, admin_id = NULL,
+                      weights = NULL, admin_ids = NULL,
                       sequential = TRUE, allow_invalid = TRUE,
                       leave_bounds = TRUE, max_tries = 100, ...) {
 
@@ -215,25 +219,21 @@ sim_bites <- function(secondaries, ids = I_now$id,
   out$contact <- "M"
   out$infected <- FALSE
 
-  if(!is.null(admin_id)) {
-    out$cell_id <- cell_to_admin(out$cell_id, admin_id)
-  }
-
   # row ids to match to I/E mats (either corresponding to admin unit or cells)
-  out$row_id <- row_ids[match(out$cell_id, cell_ids)]
+  out$row_id <- get_rowid(cell_id = out$cell_id, cell_ids, admin_ids, row_ids)
 
   return(out)
 
 }
 
 # want to do this vectorized @ the end
-cell_to_admin <- function(cell_id, admin_id) {
+cell_to_admin <- function(cell_id, admin_ids) {
 
-  return(admin_id[cell_id])
+  return(admin_ids[cell_id])
 
 }
 
-# getting cellid
+# getting cellid for use in movement funs (prob/continuous)
 get_cellid <- function(x_coord, y_coord, res_m, x_topl, y_topl,
                        ncol, nrow) {
 
@@ -244,4 +244,18 @@ get_cellid <- function(x_coord, y_coord, res_m, x_topl, y_topl,
   return(cell_id)
 
 }
+
+# Getting row ids
+get_rowid <- function(cell_id, cell_ids, admin_ids, row_ids) {
+
+  if(!is.null(admin_ids)) {
+    ids <- cell_to_admin(cell_id, admin_ids)
+    row_id <- row_ids[ids] # rows indexed by the admin unit
+  } else {
+    ids <- cell_id
+    row_id <- row_ids[match(cell_id, cell_ids)]
+  }
+  return(row_id)
+}
+
 

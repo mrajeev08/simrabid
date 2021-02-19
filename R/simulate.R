@@ -10,22 +10,26 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                      dispersal_fun = dispersal_gamma,
                      secondary_fun = negbinom_constrained,
                      incursion_fun = sim_incursions_pois,
+                     movement_fun = sim_movement_continuous,
                      sequential = TRUE, allow_invalid = TRUE,
                      leave_bounds = TRUE, max_tries = 100,
                      summary_funs = list(return_env = return_env),
                      track = TRUE,
                      prob_revacc = 0.5,
+                     weights = NULL,
                      row_probs = NULL,
-                     coverage = TRUE) {
+                     coverage = TRUE,
+                     break_threshold = 0.8) {
 
   # pass the start_up objects into the function environment
   list2env(start_up, envir = environment())
 
   # initialize vaccination & infection
   list2env(init(start_pop, start_vacc, I_seeds, I_dt, cell_ids, nlocs,
-                x_coord, y_coord), envir = environment())
+                admin_ids, bins, x_coord, y_coord, params, incursion_fun),
+           envir = environment())
 
-  list2env(vacc_dt, envir = environment()) # spit out data table into environment
+  list2env(vacc_dt, envir = environment()) # spit out data table into environment as vectors
 
   for (t in 1:tmax) {
 
@@ -50,7 +54,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     if (sum(inds) > 0) {
       nvacc <- sim_vacc(vacc_cov = vacc_cov[inds],
                         vacc_locs = vacc_locs[inds],
-                        S, V, N, loc_ids, nlocs,
+                        S, V, N, loc_ids, bins,
                         row_ids, row_probs,
                         coverage)
     } else {
@@ -63,13 +67,14 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
 
     # Transmission ----
     # incursions
-    incs <- incursion_fun(nlocs, params)
+    cell_id_incs <- incursion_fun(cell_ids = cell_ids, params = params)
 
     if(sum(incs) > 0) {
 
-      I_incs <- add_incursions(incs, cell_ids, x_coord, y_coord,
-                               counter = max(I_dt$id),
-                               tstep = t, days_in_step)
+      I_incs <- add_incursions(cell_id_incs, cell_ids, admin_ids,
+                               x_coord, y_coord,
+                               tstep = t, counter = max(I_dt$id),
+                               days_in_step)
 
       I_dt[I_incs$id] <- I_incs
 
@@ -79,8 +84,8 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     I_now <- I_dt[floor(t_infectious) == t & infected == TRUE]
 
     # Balance I & E class
-    I <- tabulate(I_now$row_id, nbins = nlocs)
-    I_loc <- tabulate(I_now$row_id[I_now$progen_id > 0], nbins = nlocs)
+    I <- tabulate(I_now$row_id, nbins = bins)
+    I_loc <- tabulate(I_now$row_id[I_now$progen_id > 0], nbins = bins)
     E <- E - I_loc
 
     if(nrow(I_now) > 0) {
@@ -96,18 +101,20 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                            x_coords = I_now$x_coord, y_coords = I_now$y_coord,
                            t_infectious = I_now$t_infectious,
                            counter = max(I_dt$id),
+                           sim_movement = movement_fun,
                            dispersal_fun, res_m,
                            row_ids, cell_ids,
-                           cells_block, cells_out_bounds, ncells,
-                           nrow, ncol,
+                           cells_block, cells_out_bounds,
+                           nrow, ncol, ncell,
                            x_topl, y_topl,
+                           weights, admin_ids,
                            sequential, allow_invalid,
                            leave_bounds, max_tries)
 
       # this should only be for ones that were successful (i.e. within & populated)
       exp_inds <- !exposed$invalid & !exposed$outbounds
       out <- sim_trans(row_id = exposed$row_id[exp_inds],
-                       S, E, I, V, nlocs,
+                       S, E, I, V, bins,
                        track)
       exposed$contact[exp_inds] <- out$contact
       exposed$infected[exp_inds] <- out$infected
@@ -148,7 +155,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     }
 
     # Final balance ----
-    E_new <- tabulate(exposed$row_id[exposed$infected == TRUE], nbins = nlocs)
+    E_new <- tabulate(exposed$row_id[exposed$infected == TRUE], nbins = bins)
     E <- E + E_new
     if (sum(is.na(S) | S < E_new) > 0) browser()
 
@@ -160,6 +167,13 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     E_mat[, t] <- E
     I_mat[, t] <- I
     V_mat[, t] <- V
+
+    prop_start_pop <- sum(N, na.rm = TRUE)/sum(start_pop, na.rm = TRUE)
+
+    if (prop_start_pop < break_threshold) {
+      break
+    }
+
   }
 
   # Reporting model (adds a reported column to the I data.table) (modifies in place!)

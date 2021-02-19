@@ -1,6 +1,17 @@
+#' Simulate movement probabilistically
+#'
+#' @inheritParams sim_bites
+#' @param ...
+#'
+#' @return a list (if sequential) or a data.table (if kernel based) with the resulting x and y coordinates, cell ids, whether
+#'   the movement was to a invalid cell, whether the movement fell within the bounds
+#'   of the simulation, and the path id for the exposed.
+#' @keywords move
+#' @export
+#'
 sim_movement_prob <-
-  function(dist_m, dispersal_fun, x0, y0, x_topl,
-           y_topl, res_m, ncol, nrow, cells_block, cells_out_bounds, path,
+  function(dist_m, angle = NULL, dispersal_fun, x0, y0, x_topl,
+           y_topl, res_m, ncol, nrow, ncell, cells_block, cells_out_bounds, path,
            leave_bounds, allow_invalid, max_tries, sequential, weights, ...) {
 
 
@@ -11,7 +22,7 @@ sim_movement_prob <-
 
       while (!accept & tries < max_tries) {
 
-        if(tries = 0) {
+        if(tries == 0) {
           dist_now <- dist_m
         } else {
           dist_now <- dispersal_fun(1)
@@ -39,7 +50,7 @@ sim_movement_prob <-
 
         while (!accept & tries < max_tries) {
 
-          if(tries = 0) {
+          if(tries == 0) {
             dist_now <- dist_m[i]
           } else {
             dist_now <- dispersal_fun(1)
@@ -71,34 +82,33 @@ sim_movement_prob <-
 }
 
 
-
-# By angle works! How to do this with populated & within for sampling?
-# Don't deal with it here...how to separate populated vs. out of district vs. out of bounds (out of district & out of bounds needs to be combined somehow--or treat it all as one and recommend a buffer of epmty cells on all sides! )
-# memoize this fun? across clusters?
-cells_away <- function(x0, y0, dist_m, res_m, ncol, nrow,
-                       x_topl, y_topl) {
-
-  n_away <- floor(dist_m/res_m) * 4
-  if(n_away == 0) n_away <- 4
-
-  incr <- (2 * pi) / n_away
-  angle <- 0 + 1:n_away * incr
-
-  x_coord <- (sin(angle) * dist_m) + x0 # convert to m
-  y_coord <- (cos(angle) * dist_m) + y0
-
-  # Get cell ids
-  cell_id <- get_cellid(x_coord, y_coord, res_m, x_topl, y_topl, ncol, nrow)
-
-  return(list(cell_id = cell_id, x_coord = x_coord, y_coord = y_coord))
-
-}
-
-# only need to do this once for each parameter set!
-# one param needs to be intercept, i.e. beta_0 (where covar = 1)
-# covars if weighted need to be the length of ncells
-# tricky for leave bounds because if true and weighted then you need to
-# decide what the proabibility is that doggoes leave the bounds
+#' Get cell weights based on covariates or a vector of null probabilities
+#'
+#' This function generates probabilities for each cell given covariates and
+#' parameter estimates in a logistic regression framework.
+#' As a default it generates uniform probabilities
+#' for each cell (0.5, with invalid and out-of-bounds set to zero if leave_bounds
+#' or allow_invalid are false respectively). Covaraites and parameters can be passed,
+#' but these must include a covariate length 1 equal to 1L and a parameter estimate
+#' of length 1 corresponding to the model intercept. The last weight is for those
+#' cell ids that fall outside the range of possible cell ids (i.e. not in 1:ncell).
+#'
+#' @param covars list of vectors corresponding to covariates for each cell,
+#'  one should be the intercept (valued at 1)
+#' @param params the parameter corresponding to the effect of each covariate,
+#'  one should be length 1 and correspond to the intercept
+#' @inheritParams sim_bites
+#'
+#' @return a vector of weights of length ncell + 1
+#'
+#' @export
+#'
+#' @example
+#' covars <- list(pop = rpois(100, 100), proximity_to_road = runif(100, 0, 10), intercept = 1)
+#' params <- list(pop = 1.2, proximity_to_road = -0.5, intercept = -5)
+#' weights <- cell_weights(covars = covars, params = params, ncell = 100,
+#'                         leave_bounds = TRUE, allow_invalid = FALSE,
+#'                         cells_block = c(1, 35, 20), cells_out_bounds = 90:100)
 cell_weights <- function(covars = list(0),
                          params = list(0),
                          ncell,
@@ -138,18 +148,33 @@ cell_weights <- function(covars = list(0),
 
 }
 
-# get cell weights
-# dealing with ones that actually are outside of all cells!
-get_cellweights <- function(weights, cell_ids) {
+#' Subset weights of cells to the candidate cell ids
+#'
+#' @inheritParams sim_bites
+#'
+#' @return a vector of weights corresponding to the cell_ids passed through
+#' @keywords move internal
+#'
+#'
+get_cellweights <- function(weights, cell_ids, ncell) {
 
-  cell_ids[cell_ids < 0] <- length(weights) # means not inside possible cells
+  cell_ids[cell_ids %in% 1:ncell] <- length(weights) # means not inside raster
   weights <- weights[cell_ids]
 
   return(weights)
 
 }
 
-# Movement based on probability
+#' Movement based on probability
+#'
+#' @inheritParams sim_bites
+#'
+#' @return list of length 1 with the chosen with sampled cell id,  x and y coordinates, whether
+#'   the movement was to a invalid cell, whether the movement fell within the bounds
+#'   of the simulation, and the path id for the exposed.
+#'
+#' @keywords move internal
+#'
 movement_prob <- function(dist_m,
                           weights, x0, y0, x_topl, y_topl,
                           ncell,
@@ -162,7 +187,7 @@ movement_prob <- function(dist_m,
   opts <- cells_away(x0, y0, dist_m, res_m, ncol, nrow, x_topl, y_topl)
 
   # Get the weights for each cell id
-  weights <- get_cellweights(weights, cell_ids)
+  weights <- get_cellweights(weights, cell_ids, ncell)
 
   # Pick the cell to move to based on probabilities
   opt_n <- length(opts$cell_id)
@@ -182,6 +207,32 @@ movement_prob <- function(dist_m,
   out$path <- path
 
   return(out)
+
+}
+
+#' Generate cell ids for sampling movement to
+#'
+#' @inheritParams sim_bites
+#'
+#' @return a list of the candidate cell_ids and the x and y coords of the movement
+#' @keywords move internal
+#'
+cells_away <- function(x0, y0, dist_m, res_m, ncol, nrow,
+                       x_topl, y_topl) {
+
+  n_away <- floor(dist_m/res_m) * 4
+  if(n_away == 0) n_away <- 4
+
+  incr <- (2 * pi) / n_away
+  angle <- 0 + 1:n_away * incr
+
+  x_coord <- (sin(angle) * dist_m) + x0 # convert to m
+  y_coord <- (cos(angle) * dist_m) + y0
+
+  # Get cell ids
+  cell_id <- get_cellid(x_coord, y_coord, res_m, x_topl, y_topl, ncol, nrow)
+
+  return(list(cell_id = cell_id, x_coord = x_coord, y_coord = y_coord))
 
 }
 

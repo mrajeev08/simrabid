@@ -4,7 +4,7 @@
 # pass parameters for each into param list in sim.IBM
 # if you're fitting these then you want to be able to pass params easily in
 # the args of the function (I think this works well? Just need unique names?)
-
+# use best fits from katie as defaults here!
 # if you want to change this then just need to change the param list & the functions accordingly
 
 # secondary function (should take from param list (n & params))
@@ -46,6 +46,29 @@ t_infectious <- function(n, t_infected, days_in_step = 7,
 # Reporting model
 binom_detect <- function(I_dt, params = list(detect_prob = 0.9)) {
   I_dt[, reported := rbinom(.N, size = 1, prob = params$detect_prob)]
+}
+
+# Reporting model
+binom_beta_detect <- function(I_dt,
+                              params = list(alpha = 80.1,
+                                            beta = 8.9)) {
+  probs <- rbeta(1, params$alpha, params$beta)
+  I_dt[, reported := rbinom(.N, size = 1, prob = probs)]
+}
+
+# Monthly probabilities
+binom_beta_detect_monthly <- function(I_dt, tmax,
+                                      params = list(alpha = 80.1, beta = 8.9)) {
+  I_dt[, month := floor(tstep/4)][, detect_prob := rbeta(1, params$alpha,
+                                                   params$beta), by = month]
+  I_dt[, reported := rbinom(.N, size = 1, prob = detect_prob)]
+}
+
+# beta_pars from mean
+est_beta_pars <- function(mean, var) {
+  alpha <- ((1 - mean) / var - 1 / mean) * mean ^ 2
+  beta <- alpha * (1 / mean - 1)
+  return(params = list(alpha = alpha, beta = beta))
 }
 
 # Getting probability from rate ------------------------------------------------

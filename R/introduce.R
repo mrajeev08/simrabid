@@ -1,3 +1,31 @@
+#' Seed incursions explicitly
+#'
+#' \code{sim_incursions_hardwired} takes known incursions and seeds them explicitly
+#' in time and space.
+#'
+#' @inheritSection sim_incursions_pois Section details
+#'
+#' @inherit sim_incursions_pois
+#' @param params consisting of two numeric vectors:
+#'  the row ids of the known incursions (`row_ids`) and
+#'  the timestep at which the known incursions should be seeded (`tsteps`)
+#' @param current_tstep the current timestep in the simulation
+#'
+#' @inheritSection sim_incursions_pois Section return
+#' @export
+#' @keywords incursions
+#'
+sim_incursions_hardwired <- function(ncell,
+                                     params = list(cell_ids = cell_ids_empirical,
+                                                   tsteps = tstep_empirical),
+                                     current_tstep = t, ...) {
+
+  # filter list of empirical incursions
+  cell_id <- params$cell_ids[params$tsteps %in% current_tstep]
+
+  return(cell_id)
+}
+
 #' Simulate incursions
 #'
 #' \code{sim_incursions_pois} simulates incursions from a poisson distribution.
@@ -16,45 +44,19 @@
 #' @export
 #' @keywords incursions
 #'
-sim_incursions_pois <- function(nlocs,
-                                params = list(iota = 1)) {
+sim_incursions_pois <- function(cell_ids,
+                                params = list(iota = 1),
+                                ...) {
 
   # number of incursions this week
   n_incs <- rpois(1, params$iota)
 
-  # sample cell ids by nlocs
-  row_id <- sample(nlocs, n_incs, replace = TRUE)
-  incs <- tabulate(row_id, nbins = nlocs)
-  return(incs)
+  # sample cell ids by bins
+  cell_id <- sample(cell_ids, n_incs, replace = TRUE)
+
+  return(cell_id)
 }
 
-#' Seed incursions explicitly
-#'
-#' \code{sim_incursions_hardwired} takes known incursions and seeds them explicitly
-#' in time and space.
-#'
-#' @inheritSection sim_incursions_pois Section details
-#'
-#' @inherit sim_incursions_pois
-#' @param params consisting of two numeric vectors:
-#'  the row ids of the known incursions (`row_ids`) and
-#'  the timestep at which the known incursions should be seeded (`tsteps`)
-#' @param current_tstep the current timestep in the simulation
-#'
-#' @inheritSection sim_incursions_pois Section return
-#' @export
-#' @keywords incursions
-#'
-sim_incursions_hardwired <- function(nlocs,
-                                     params = list(row_ids = row_ids_empirical,
-                                                   tsteps = tstep_empirical),
-                                     current_tstep = t) {
-
-  # filter list of empirical incursions
-  row_id <- params$row_ids[params$tsteps %in% current_tstep]
-  incs <- tabulate(row_id, nbins = nlocs)
-  return(incs)
-}
 
 #' Add incursions to infectious line list
 #'
@@ -76,23 +78,25 @@ sim_incursions_hardwired <- function(nlocs,
 #' @import data.table
 #' @keywords incursions internal
 #'
-add_incursions <- function(incs, cell_ids, x_coord, y_coord, tstep,
+add_incursions <- function(cell_id_incs, cell_ids, admin_ids = NULL,
+                           x_coord, y_coord, tstep,
                            counter, days_in_step = 7) {
 
-  n_incs <- sum(incs)
+  n_incs <- length(cell_id_incs)
 
   # date infectious (this tstep just draw the day!)
   t_infectious <- (sample(1:days_in_step, n_incs,
                           replace = FALSE) + tstep)/days_in_step
-  row_id <- rep(which(incs > 0), incs[incs > 0])
-  cell_id <- rep(cell_ids[incs > 0], incs[incs > 0])
+  row_id <- get_rowid(cell_id_incs, cell_ids, admin_ids, row_ids)
+
+  x_coord <- x_coord[cell_id_incs]
+  y_coord < y_coord[cell_id_incs]
 
   # incursions have a progenitor id of -1
   data.table(id = counter + 1:n_incs,
-             cell_id, row_id, progen_id = -1L,
+             cell_id = cell_id_incs, row_id, progen_id = -1L,
              path = 0L,
-             x_coord = x_coord[row_id],
-             y_coord = y_coord[row_id],
+             x_coord, y_coord,
              invalid = FALSE, outbounds = FALSE,
              t_infected = 0, contact = "N",
              infected = TRUE, t_infectious)

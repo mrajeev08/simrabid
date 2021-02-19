@@ -16,3 +16,7 @@ RoxygenNote: 7.1.1
 Imports: 
     data.table,
     Matrix
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr

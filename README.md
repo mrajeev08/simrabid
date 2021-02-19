@@ -13,6 +13,9 @@ development version: clone the repo and from within the directory, run `devtools
 
 ## To Do
 
+- Add a time out (i.e. to better manage computational budgets we stop simulations that deplete > 20% of the starting population)
+- memoizing cell id functions?
+- Village metapopulation (separate function?)
 - Keys for faster data.table filtering (i.e. for boolean values especially! store the 0/1 as logical!)
 - Do tests to make sure it makes sense with SD data (unit tests?!)
 - Document and build! (managing namespace & dependencies)

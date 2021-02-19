@@ -116,10 +116,12 @@ sim_campaigns <- function(locs, campaign_prob = 0.5,
 #'   respectively, of same length
 #' @param loc_ids vector of numeric or character ids of same length as **S/V/N** that
 #'   matches the demographic vectors to the locations from `vacc_locs`
-#' @param nlocs numeric, the total number of grid cells being simulated (i.e. at the scale of the simulation,
-#'   this can be different than the scale of the vaccination campaigns)
+#' @param bins numeric, the total number of grid cells being simulated (i.e. at the scale of the simulation,
+#'   this can be different than the scale of the vaccination campaigns) OR the
+#'   number of admin units, for when simulating at admin rather
+#'   than grid cell level, defaults to NULL
 #' @param row_ids numeric vector of same length as **S/V/N** of the row id corresponding to the demographic vectors to
-#'   sample which grid cell vaccinations are allocated to
+#'   sample which grid cell or admin unit vaccinations are allocated to (if admin unit the same as loc_ids)
 #' @param row_probs numeric vector, optionally can pass the probability of vaccination
 #'   for each grid cell, defaults to NULL.
 #' @param coverage boolean, defaults to TRUE, if TRUE then coverage estimates [0, 1]
@@ -132,7 +134,7 @@ sim_campaigns <- function(locs, campaign_prob = 0.5,
 #' @import data.table
 #' @keywords internal
 #'
-sim_vacc <- function(vacc_cov, vacc_locs, S, V, N, loc_ids, nlocs,
+sim_vacc <- function(vacc_cov, vacc_locs, S, V, N, loc_ids, bins,
                      row_ids, row_probs = NULL, coverage = TRUE) {
 
   # make & join up data tables
@@ -176,7 +178,7 @@ sim_vacc <- function(vacc_cov, vacc_locs, S, V, N, loc_ids, nlocs,
   ]
 
   # update & return V
-  nvacc <- tabulate(vacc_ids$row_id, nbins = nlocs) # by row id
+  nvacc <- tabulate(vacc_ids$row_id, nbins = bins) # by row id
 
   return(nvacc)
 }

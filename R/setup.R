@@ -63,8 +63,8 @@ setup_space <- function(shapefile, resolution = 1000,
 #' @export
 #' @import data.table
 #' @keywords setup
-#'
-setup_sim <- function(tmax, start_pop, rast) {
+#' Need to do this differently if by admin ids
+setup_sim <- function(tmax, start_pop, rast, by_admin = TRUE) {
 
   # cells to block / not track
   all_inds <- block_cells(rast, start_pop)
@@ -72,17 +72,24 @@ setup_sim <- function(tmax, start_pop, rast) {
   # only tracking populated cells within district (no new pops in new cells)
   cell_ids <- all_inds$track_inds
   loc_ids <- rast[cell_ids]
+  coords <- raster::coordinates(rast)
   nlocs <- length(cell_ids)
-  coords <- raster::coordinates(rast)[cell_ids, ]
-  start_pop <- start_pop[cell_ids]
+
+  if(by_admin) {
+    bins <- max(rast[], na.rm = TRUE)
+  } else {
+    start_pop <- start_pop[cell_ids]
+    bins <- nlocs
+  }
 
   # state matrices
-  row_ids <- 1:nlocs
-  S_mat <- V_mat <- N_mat <- I_mat <- E_mat <- matrix(0L, nrow = nlocs, ncol = tmax)
+  row_ids <- 1:bins
+  S_mat <- V_mat <- N_mat <- I_mat <- E_mat <- matrix(0L, nrow = bins, ncol = tmax)
+
 
   # Set up I_dt (data table)
-  I_dt <- data.table(id = 0, cell_id = 0, row_id = 0,
-                     progen_id = 0, path = 0L, x_coord = 0,
+  I_dt <- data.table(id = 0L, cell_id = 0L, row_id = 0L,
+                     progen_id = 0L, path = 0L, x_coord = 0,
                      y_coord = 0, invalid = TRUE, outbounds = TRUE,
                      t_infected = 0, contact = "N",
                      infected = FALSE, t_infectious = 0)
@@ -100,10 +107,14 @@ setup_sim <- function(tmax, start_pop, rast) {
               start_pop = start_pop,
               nrow = nrow(rast),
               ncol = ncol(rast),
+              ncell = ncell(rast),
               x_topl = bbox(rast)[1, "min"],
               y_topl = bbox(rast)[2, "max"],
               x_coord = coords[, 1],
-              y_coord = coords[, 2], res_m = res(rast)[1], tmax = tmax))
+              y_coord = coords[, 2],
+              admin_ids = rast[], # admin unit ids to aggregate to
+              bins = bins,
+              res_m = res(rast)[1], tmax = tmax))
 }
 
 #' Initialize the simulation
@@ -113,35 +124,32 @@ setup_sim <- function(tmax, start_pop, rast) {
 #' @keywords internal
 #' @import data.table
 #'
-init <- function(start_pop, start_vacc, I_seeds, I_dt, cell_ids, nlocs,
-                 x_coord, y_coord) {
+init <- function(start_pop, start_vacc, I_seeds, I_dt, cell_ids,
+                 admin_ids = NULL,
+                 bins, nlocs, x_coord, y_coord,
+                 params, incursion_fun) {
 
   # Starting pop + sus
   if(length(start_vacc) != 1 & is.integer(start_vacc)) {
     V <- start_vacc
   } else {
-    V <- rbinom(n = nlocs, size = start_pop, prob = start_vacc)
+    V <- rbinom(n = bins, size = start_pop, prob = start_vacc)
   }
 
   S <- start_pop - V
 
   # Seed cases at t0 and create data.table
-  row_id <- sample(nlocs, I_seeds, replace = TRUE)
+  cell_id_incs <- sample(cell_ids, I_seeds, replace = TRUE)
 
-  I_init <- data.table(id = 1:I_seeds, cell_id = cell_ids[row_id],
-                      row_id, progen_id = 0, path = 0L,
-                      x_coord = x_coord[row_id],
-                      y_coord = y_coord[row_id],
-                      invalid = TRUE, outbounds = TRUE,
-                      t_infected = 0, contact = "N",
-                      infected = TRUE,
-                      t_infectious = 1)
+  I_init <- add_incursions(cell_id_incs, cell_ids, admin_ids,
+                           x_coord, y_coord, tstep,
+                           counter, days_in_step = 7)
 
   I_dt[I_init$id] <- I_init # this should get updated in global environment
 
   # Summarize and put into I!
-  I <- tabulate(I_dt$row_id, nbins = nlocs)
-  E <- rep(0, nlocs)
+  I <- tabulate(I_dt$row_id, nbins = bins)
+  E <- rep(0, bins)
 
   return(list(S = S, V = V, I = I, E = E, I_dt = I_dt, N = start_pop))
 }
@@ -151,8 +159,8 @@ init <- function(start_pop, start_vacc, I_seeds, I_dt, cell_ids, nlocs,
 #' @keywords internal
 #'
 double_I <- function(I_dt) {
-  I_skeleton <- data.table(id = 0, cell_id = 0, row_id = 0,
-                           progen_id = 0, path = 0L, x_coord = 0,
+  I_skeleton <- data.table(id = 0L, cell_id = 0L, row_id = 0L,
+                           progen_id = 0L, path = 0L, x_coord = 0,
                            y_coord = 0, invalid = TRUE, outbounds = TRUE,
                            t_infected = 0, contact = "N",
                            infected = FALSE, t_infectious = 0)
