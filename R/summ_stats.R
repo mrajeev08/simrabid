@@ -47,9 +47,13 @@ inc_stats <- function(I_dt, tmax, ncell, data) {
 
   # spatial corr
   normalized <- mean(dist(cbind(I_dt$x_coord, I_dt$y_coord)))
-  mean_dist <- get_mean_dist(t_dt = I_dt[, .(tstep, x_coord, y_coord)],
-                             t_window = 4, samp_max = 1e4)
-  mean_dist_norm <- mean_dist/normalized
+  mean_dist_4wks <- get_mean_dist(t_dt = I_dt[, .(tstep, x_coord, y_coord)],
+                             t_window = 8, samp_max = 1e4)
+  mean_dist_4wks_norm <- mean_dist/normalized
+  mean_dist_8wks <- get_mean_dist(t_dt = I_dt[, .(tstep, x_coord, y_coord)],
+                             t_window = 8, samp_max = 1e4)
+  mean_dist_8wks_norm <- mean_dist/normalized
+
 
   # loss functions
   # will already be ordered by month due to keyby
@@ -65,9 +69,12 @@ inc_stats <- function(I_dt, tmax, ncell, data) {
   spat_loss <- mean(abs(I_cell$N - data$cases_by_cell))
 
   return(c(list(max_I = max_I, median_I = median_I, mean_I = mean_I,
-                ks_stat = ks_stat, mean_dist = mean_dist, hist_ss = hist_ss,
-                hist_rmse = hist_rmse,
-                mean_dist_norm = mean_dist_norm, spat_rmse = spat_rmse,
+                ks_stat = ks_stat,
+                hist_ss = hist_ss, hist_rmse = hist_rmse,
+                mean_dist_4wks = mean_dist_4wks,
+                mean_dist_8wks = mean_dist_8wks,
+                mean_dist_4wks_norm = mean_dist_4wks_norm,
+                mean_dist_8wks_norm = mean_dist_8wks_norm, spat_rmse = spat_rmse,
                 spat_ss = spat_ss, temp_rmse = temp_rmse,
                 temp_ss = temp_ss), as.list(acfs)))
 
