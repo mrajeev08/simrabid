@@ -11,10 +11,10 @@
 # ks test statistic for frequency of case counts per month (temporal bit) (so that its okay if timed out)
 
 
-I_dt <- data.table(tstep = runif(1e4, 0, 4*24),
-                   x_coord = runif(1e4, 0, 1),
-                   y_coord = runif(1e4, 0, 1))
-
+# I_dt <- data.table(tstep = runif(1e4, 0, 4*24),
+#                    x_coord = runif(1e4, 0, 1),
+#                    y_coord = runif(1e4, 0, 1))
+#
 
 # Incidence stats
 # data = inc_hist + breaks (which should be 1 longer than length of inc_hist)
@@ -89,10 +89,10 @@ inc_stats <- function(I_dt, tmax, ncell, data) {
 # Normalized by mean distance between all cases (dist_mat mean)
 
 # Naive version with coords (beyond 10,000 coords this becomes very slow)
-tstep <- runif(1e4, 0, 4*24)
-x_coord <- runif(1e4, 0, 1)
-y_coord <- runif(1e4, 0, 1)
-mean_dist_window(x_coord, y_coord, tstep, 4)
+# tstep <- runif(1e4, 0, 4*24)
+# x_coord <- runif(1e4, 0, 1)
+# y_coord <- runif(1e4, 0, 1)
+# mean_dist_window(x_coord, y_coord, tstep, 4)
 
 mean_dist_window <- function(I_dt, t_window = 4,
                              normalize = TRUE) {

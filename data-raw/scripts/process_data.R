@@ -99,10 +99,13 @@ serial <- read.csv("data-raw/raw/parameters_KH/SI_params.csv")
 
 param_defaults <-
   list(
-    "steps" = list(shape = steps$shape, scale = steps$scale),
-    "disp" = list(meanlog = disp$DK_meanlog, sdlog = disp$DK_sdlog),
-    "serial" = list(meanlog = serial$SI_ml, sdlog = serial$SI_sdlog)
-    )
+    steps_shape = steps$shape, steps_scale = steps$scale,
+    disp_meanlog = disp$DK_meanlog, disp_sdlog = disp$DK_sdlog,
+    serial_meanlog = serial$SI_ml, serial_sdlog = serial$SI_sdlog,
+    detect_alpha = 80.1, detect_beta = 8.9,
+    detect_prob = 0.9
+  )
+
 
 usethis::use_data(param_defaults, overwrite = TRUE)
 

@@ -38,7 +38,7 @@
 sim_movement_continuous <-
   function(dist_m, angle, dispersal_fun, x0, y0, x_topl,
            y_topl, res_m, ncol, nrow, ncell, cells_block, cells_out_bounds, path,
-           leave_bounds, allow_invalid, max_tries, sequential,
+           leave_bounds, allow_invalid, max_tries, sequential, params,
            ...) {
 
     if(sequential) {
@@ -52,7 +52,7 @@ sim_movement_continuous <-
           dist_now <- dist_m
           angle_now <- angle
         } else {
-          dist_now <- dispersal_fun(1)
+          dist_now <- dispersal_fun(1, params)
           angle_now <- angle_fun(1)
         }
 
@@ -86,7 +86,7 @@ sim_movement_continuous <-
 
         out[inds, ] <-
           as.data.table(
-            move_continuous(dist_m = dispersal_fun(retry),
+            move_continuous(dist_m = dispersal_fun(retry, params),
                             angle = angle_fun(retry),
                             x0 = x0[inds], y0 = y0[inds],
                             x_topl, y_topl, res_m, ncol, nrow, ncell,

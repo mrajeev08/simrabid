@@ -37,7 +37,6 @@ setup_space <- function(shapefile, resolution = 1000,
     return(r)
 
   } else {
-
     if(use_fasterize && "sf" %in% class(shapefile) && require(fasterize)) {
       rast <- fasterize::fasterize(shapefile, r, field = id_col)
     } else {
@@ -58,13 +57,19 @@ setup_space <- function(shapefile, resolution = 1000,
 #' @param start_pop integer vector, the population size in each cell of `rast`
 #' @param rast raster, from `setup_space` the output raster with each cell allocated
 #'   to a location
+#' @param by_admin logical, should mixing be at the admin (or arbitrary) scale?
 #'
 #' @return a list of objects needed for the simulation
 #' @export
 #' @import data.table
 #' @keywords setup
 #' Need to do this differently if by admin ids
-setup_sim <- function(tmax, start_pop, rast, by_admin = TRUE) {
+setup_sim <- function(tmax, start_pop, rast,
+                      death_rate_annual,
+                      birth_rate_annual,
+                      waning_rate_annual,
+                      step = 52,
+                      by_admin = FALSE) {
 
   # cells to block / not track
   all_inds <- block_cells(rast, start_pop)
@@ -77,10 +82,26 @@ setup_sim <- function(tmax, start_pop, rast, by_admin = TRUE) {
 
   if(by_admin) {
     bins <- max(rast[], na.rm = TRUE)
+    # need to group by id and spit back out
+    pop_dt <- data.table(admin_id = rast[], start_pop = start_pop)
+    start_pop <- pop_dt[!is.na(admin_id)][, .(pop = sum(start_pop, na.rm = TRUE)),
+                                          by = "admin_id"]$pop
   } else {
     start_pop <- start_pop[cell_ids]
     bins <- nlocs
   }
+
+  if(length(birth_rate_annual) > 1 & !by_admin) {
+    if(length(birth_rate_annual) != max(rast[], na.rm = TRUE)) {
+      stop("Error, length of birth rates is not equal to 1 or number of admin units")
+    }
+    birth_rate_annual <- birth_rate_annual[rast[cell_ids]]
+  }
+
+  # other dem params
+  death_prob <- get_prob(rate = death_rate_annual, step = step) # annual death rate to prob
+  birth_prob <- get_prob(rate = birth_rate_annual, step = step) # annual birth rate to prob
+  waning_prob <- get_prob(rate = waning_rate_annual, step = step) # annual waning to prob
 
   # state matrices
   row_ids <- 1:bins
@@ -114,7 +135,9 @@ setup_sim <- function(tmax, start_pop, rast, by_admin = TRUE) {
               y_coord = coords[, 2],
               admin_ids = rast[], # admin unit ids to aggregate to
               bins = bins,
-              res_m = res(rast)[1], tmax = tmax))
+              res_m = res(rast)[1], tmax = tmax,
+              death_prob = death_prob, birth_prob = birth_prob,
+              waning_prob = waning_prob))
 }
 
 #' Initialize the simulation
@@ -125,7 +148,7 @@ setup_sim <- function(tmax, start_pop, rast, by_admin = TRUE) {
 #' @import data.table
 #'
 init <- function(start_pop, start_vacc, I_seeds, I_dt, cell_ids,
-                 admin_ids = NULL,
+                 admin_ids = NULL, row_ids,
                  bins, nlocs, x_coord, y_coord,
                  params, incursion_fun) {
 
@@ -141,9 +164,11 @@ init <- function(start_pop, start_vacc, I_seeds, I_dt, cell_ids,
   # Seed cases at t0 and create data.table
   cell_id_incs <- sample(cell_ids, I_seeds, replace = TRUE)
 
-  I_init <- add_incursions(cell_id_incs, cell_ids, admin_ids,
-                           x_coord, y_coord, tstep,
-                           counter, days_in_step = 7)
+  I_init <- add_incursions(cell_id_incs, cell_ids,
+                           admin_ids, row_ids,
+                           x_coord, y_coord, tstep = 0,
+                           counter = 0,
+                           days_in_step = 7)
 
   I_dt[I_init$id] <- I_init # this should get updated in global environment
 
@@ -175,8 +200,8 @@ double_I <- function(I_dt) {
 block_cells <- function(rast, start_pop) {
 
   in_inds <- which(!is.na(rast[]))
-  out_inds <- which(is.na(rast))
-  no_pop <- which(start_pop < 1)
+  out_inds <- which(is.na(rast[]))
+  no_pop <- which(start_pop < 1 | is.na(start_pop))
   block_inds <- no_pop[no_pop %in% in_inds]
 
   # Ones to track: inside district & unblocked

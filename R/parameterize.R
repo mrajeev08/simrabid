@@ -34,9 +34,9 @@ nbinom_constrained <- function(n,
 #' @examples
 
 dispersal_lognorm <- function(n,
-                              paramsp) {
+                              params) {
 
-  rlnorm(n, meanlog = params$meanlog, sdlog = params$sdlog)
+  rlnorm(n, meanlog = params$disp_meanlog, sdlog = params$disp_sdlog)
 
 }
 
@@ -51,9 +51,9 @@ dispersal_lognorm <- function(n,
 #'
 #' @examples
 serial_lognorm <- function(n,
-                           params = param_defaults$serial) {
+                           params) {
 
-  rlnorm(n, meanlog = params$meanlog, sdlog = params$sdlog)
+  rlnorm(n, meanlog = params$serial_meanlog, sdlog = params$serial_sdlog)
 
 }
 
@@ -68,9 +68,9 @@ serial_lognorm <- function(n,
 #'
 #' @examples
 steps_weibull <- function(n,
-                          params = param_defaults$steps) {
+                          params) {
 
-  rweibull(n, shape = params$shape, scale = params$scale)
+  rweibull(n, shape = params$steps_shape, scale = params$steps_scale)
 
 }
 
@@ -87,9 +87,9 @@ steps_weibull <- function(n,
 #'
 #' @examples
 t_infectious <- function(n, t_infected, days_in_step = 7,
-                         serial_fun) {
+                         serial_fun, params) {
 
-  return(t_infected + serial_fun(n)/days_in_step)
+  return(t_infected + serial_fun(n, params)/days_in_step)
 
 }
 
@@ -118,9 +118,9 @@ binom_detect <- function(I_dt, params = list(detect_prob = 0.9)) {
 #'
 #' @examples
 beta_detect <- function(I_dt,
-                              params = list(alpha = 80.1,
-                                            beta = 8.9)) {
-  probs <- rbeta(1, params$alpha, params$beta)
+                              params = list(detect_alpha = 80.1,
+                                            detect_beta = 8.9)) {
+  probs <- rbeta(1, params$detect_alpha, params$detect_beta)
   I_dt[, detected := rbinom(.N, size = 1, prob = probs)]
 }
 
@@ -136,9 +136,11 @@ beta_detect <- function(I_dt,
 #'
 #' @examples
 beta_detect_monthly <- function(I_dt, tmax,
-                                      params = list(alpha = 80.1, beta = 8.9)) {
-  I_dt[, month := floor(tstep/4)][, detect_prob := rbeta(1, params$alpha,
-                                                   params$beta), by = month]
+                                      params = list(detect_alpha = 80.1,
+                                                    detect_beta = 8.9)) {
+  I_dt[, month := floor(tstep/4)][, detect_prob := rbeta(1, params$detect_alpha,
+                                                         params$detect_beta),
+                                  by = month]
   I_dt[, detected := rbinom(.N, size = 1, prob = detect_prob)]
 }
 

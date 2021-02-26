@@ -1,14 +1,12 @@
 
 simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
-                     params = list(R0 = 1.2, k = 1, iota = 4),
-                     death_prob = get_prob(rate = 0.48, step = 52), # annual death rate to prob
-                     waning_prob = get_prob(rate = 1/3, step = 52), # annual waning to prob
-                     birth_prob = get_prob(rate = 0.52, step = 52), # annual birth rate to prob
+                     params = c(list(R0 = 1.2, k = 1, iota = 4),
+                                param_defaults),
                      days_in_step = 7,
-                     reporting_fun = binom_detect,
-                     generation_fun = gen_gamma,
-                     dispersal_fun = dispersal_gamma,
-                     secondary_fun = negbinom_constrained,
+                     observe_fun = beta_detect_monthly,
+                     serial_fun = serial_lognorm,
+                     dispersal_fun = steps_weibull,
+                     secondary_fun = nbinom_constrained,
                      incursion_fun = sim_incursions_pois,
                      movement_fun = sim_movement_continuous,
                      sequential = TRUE, allow_invalid = TRUE,
@@ -25,13 +23,13 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
   list2env(start_up, envir = environment())
 
   # initialize vaccination & infection
-  list2env(init(start_pop, start_vacc, I_seeds, I_dt, cell_ids, nlocs,
-                admin_ids, bins, x_coord, y_coord, params, incursion_fun),
+  list2env(init(start_pop, start_vacc, I_seeds, I_dt, cell_ids, admin_ids,
+                row_ids, bins, nlocs, x_coord, y_coord, params, incursion_fun),
            envir = environment())
 
   list2env(vacc_dt, envir = environment()) # spit out data table into environment as vectors
 
-  for (t in 1:tmax) {
+  for (t in seq_len(tmax)) {
 
     # Demography -----
     # Vaccinated class
@@ -52,7 +50,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     inds <- vacc_times == t
 
     if (sum(inds) > 0) {
-      nvacc <- sim_vacc(vacc_cov = vacc_cov[inds],
+      nvacc <- sim_vacc(vacc_est = vacc_est[inds],
                         vacc_locs = vacc_locs[inds],
                         S, V, N, loc_ids, bins,
                         row_ids, row_probs,
@@ -69,10 +67,9 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     # incursions
     cell_id_incs <- incursion_fun(cell_ids = cell_ids, params = params)
 
-    if(sum(incs) > 0) {
-
+    if(sum(cell_id_incs) > 0) {
       I_incs <- add_incursions(cell_id_incs, cell_ids, admin_ids,
-                               x_coord, y_coord,
+                               row_ids, x_coord, y_coord,
                                tstep = t, counter = max(I_dt$id),
                                days_in_step)
 
@@ -109,7 +106,8 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                            x_topl, y_topl,
                            weights, admin_ids,
                            sequential, allow_invalid,
-                           leave_bounds, max_tries)
+                           leave_bounds, max_tries,
+                           params)
 
       # this should only be for ones that were successful (i.e. within & populated)
       exp_inds <- !exposed$invalid & !exposed$outbounds
@@ -124,7 +122,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
       exposed$t_infectious[exposed$infected] <-
         t_infectious(n = length(exposed$t_infectious[exposed$infected]),
                      t_infected = exposed$t_infected[exposed$infected],
-                     days_in_step, generation_fun)
+                     days_in_step, serial_fun, params)
 
       # Make sure colum order matches that of I_dt (better way to do this)
       setcolorder(exposed, c('id', 'cell_id', 'row_id', 'progen_id',
@@ -177,7 +175,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
   }
 
   # Reporting model (adds a reported column to the I data.table) (modifies in place!)
-  reporting_fun(I_dt) # change this so it operates within data.table?
+  observe_fun(I_dt, params) # change this so it operates within data.table?
 
   # Summary functions which returns list of objs (or list of lists)
   out <- lapply(summary_funs, function(x) x())

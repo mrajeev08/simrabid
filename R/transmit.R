@@ -155,14 +155,15 @@ sim_bites <- function(secondaries, ids = I_now$id,
                       x_topl, y_topl,
                       weights = NULL, admin_ids = NULL,
                       sequential = TRUE, allow_invalid = TRUE,
-                      leave_bounds = TRUE, max_tries = 100, ...) {
+                      leave_bounds = TRUE, max_tries = 100,
+                      params, ...) {
 
   # set up
   progen_ids <- rep(ids, secondaries)
   origin_x <- rep(x_coords, secondaries)
   origin_y <- rep(y_coords, secondaries)
   nsim <- length(progen_ids)
-  dist_m <- dispersal_fun(nsim)
+  dist_m <- dispersal_fun(nsim, params)
   if(is.null(weights))  angles <- NULL else angles <- angle_fun(nsim)
 
   if(sequential) {
@@ -191,7 +192,7 @@ sim_bites <- function(secondaries, ids = I_now$id,
                                nrow, ncell,
                                cells_block, cells_out_bounds, path,
                                leave_bounds, allow_invalid, max_tries,
-                               sequential)
+                               sequential, params)
 
       }
 
@@ -209,7 +210,7 @@ sim_bites <- function(secondaries, ids = I_now$id,
                       y_topl, res_m, ncol, nrow, cells_block, cells_out_bounds,
                       path = 0,
                       leave_bounds, allow_invalid, max_tries,
-                      sequential)
+                      sequential, params)
   }
 
   # add in ids

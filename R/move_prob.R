@@ -12,7 +12,8 @@
 sim_movement_prob <-
   function(dist_m, angle = NULL, dispersal_fun, x0, y0, x_topl,
            y_topl, res_m, ncol, nrow, ncell, cells_block, cells_out_bounds, path,
-           leave_bounds, allow_invalid, max_tries, sequential, weights, ...) {
+           leave_bounds, allow_invalid, max_tries, sequential, weights,
+           params, ...) {
 
 
     if(sequential) {
@@ -25,7 +26,7 @@ sim_movement_prob <-
         if(tries == 0) {
           dist_now <- dist_m
         } else {
-          dist_now <- dispersal_fun(1)
+          dist_now <- dispersal_fun(1, params)
         }
 
         out <- movement_prob(dist_m = dist_now, weights, x0, y0, x_topl, y_topl, ncell,
@@ -53,7 +54,7 @@ sim_movement_prob <-
           if(tries == 0) {
             dist_now <- dist_m[i]
           } else {
-            dist_now <- dispersal_fun(1)
+            dist_now <- dispersal_fun(1, params)
           }
 
           out_i <- movement_prob(dist_m = dist_now, weights, x0 = x0[i],

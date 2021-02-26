@@ -18,7 +18,7 @@
 #' - And if locs & probs don't match in length
 #' - And if functions passed don't have n as an argument (can they use function env vars though?)
 #' - Tests: return should be a data.table with three columns; timestep should be in realm of possible &
-#' burn in period should be zero. vacc_cov should be between [0, 1], vacc_locs should be all from locs only; no NAs
+#' burn in period should be zero. vacc_est should be between [0, 1], vacc_locs should be all from locs only; no NAs
 #'
 #' @param locs numeric or character vector of ids of locations
 #' @param campaign_prob either a single numeric probability [0, 1] or vector
@@ -33,7 +33,7 @@
 #'   a given location
 #'
 #' @return a data.table with three columns: vacc_times (timestep of campaign),
-#'   vacc_cov (coverage estimate), vacc_locs (location of campaign)
+#'   vacc_est (coverage/number vaccinated estimate), vacc_locs (location of campaign)
 #'
 #' @export
 #' @import data.table
@@ -71,7 +71,7 @@ sim_campaigns <- function(locs, campaign_prob = 0.5,
                           }) {
   vacc_dt <- data.table(
     vacc_locs = rep(locs, each = sim_years),
-    years = rep(1:sim_years, length(locs)),
+    years = rep(1:sim_years, length(locs))
   )
 
   if(length(campaign_prob) > 1) {
@@ -82,15 +82,15 @@ sim_campaigns <- function(locs, campaign_prob = 0.5,
   vacc_dt <- vacc_dt[vaccinated == TRUE]
 
   if (is.function(coverage)) {
-    vacc_cov <- coverage(nrow(vacc_dt)) # coverage acheived during campaign
+    vacc_est <- coverage(nrow(vacc_dt)) # coverage acheived during campaign
   }
 
-  vacc_dt[, c("vacc_times", "vacc_cov") := .(
+  vacc_dt[, c("vacc_times", "vacc_est") := .(
     sample_tstep(.N) + (years - 1) * steps_in_year + burn_in_years * steps_in_year,
     coverage
   )]
 
-  return(vacc_dt[, c("vacc_times", "vacc_cov", "vacc_locs")])
+  return(vacc_dt[, c("vacc_times", "vacc_est", "vacc_locs")])
 }
 
 #' Simulate vaccination at individual level
@@ -109,8 +109,8 @@ sim_campaigns <- function(locs, campaign_prob = 0.5,
 #' - Tests/ catches for lengths? This might slow things down! (maybe should be higher level test/catch)
 #' - Tests: return should be same length as nlocs, should be positive integer & non NA
 #'
-#' @param vacc_cov numeric vector of coverage estimates (either [0, 1] or the number vaccinated)
-#' @param vacc_locs vector of numeric or character ids of same length as `vacc_cov`,
+#' @param vacc_est numeric vector of coverage estimates (either [0, 1] or the number vaccinated)
+#' @param vacc_locs vector of numeric or character ids of same length as `vacc_est`,
 #'   the locations corresponding to the coverage estimates
 #' @param S,V,N, numeric vector of Susceptibles, Vaccinated, and the Population size
 #'   respectively, of same length
@@ -134,7 +134,7 @@ sim_campaigns <- function(locs, campaign_prob = 0.5,
 #' @import data.table
 #' @keywords internal
 #'
-sim_vacc <- function(vacc_cov, vacc_locs, S, V, N, loc_ids, bins,
+sim_vacc <- function(vacc_est, vacc_locs, S, V, N, loc_ids, bins,
                      row_ids, row_probs = NULL, coverage = TRUE) {
 
   # make & join up data tables
@@ -146,7 +146,7 @@ sim_vacc <- function(vacc_cov, vacc_locs, S, V, N, loc_ids, bins,
     by = "loc_ids",
     .SDcols = c("S", "V", "N")
   ]
-  vacc_now[, vacc := vacc_cov[match(loc_ids, vacc_locs)]]
+  vacc_now[, vacc := vacc_est[match(loc_ids, vacc_locs)]]
 
   if (coverage) {
     vacc_now[, vacc := rbinom(length(vacc), size = N, prob = vacc)]
