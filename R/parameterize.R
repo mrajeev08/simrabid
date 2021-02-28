@@ -89,7 +89,11 @@ steps_weibull <- function(n,
 t_infectious <- function(n, t_infected, days_in_step = 7,
                          serial_fun, params) {
 
-  return(t_infected + serial_fun(n, params)/days_in_step)
+  t_infects <- t_infected + serial_fun(n, params)/days_in_step
+  t_infects <- ifelse(floor(t_infects) == floor(t_infected),
+                      floor(t_infected) + 1,
+                      t_infects)
+  return(t_infects)
 
 }
 

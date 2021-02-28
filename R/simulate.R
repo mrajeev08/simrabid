@@ -30,7 +30,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
 
   list2env(vacc_dt, envir = environment()) # spit out data table into environment as vectors
 
-  if(!by_admin) admin_id <- NULL
+  if(!by_admin) admin_ids <- NULL
 
   for (t in seq_len(tmax)) {
 
@@ -71,6 +71,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
 
     # Transmission ----
     # incursions
+
     cell_id_incs <- incursion_fun(cell_ids = cell_ids, params = params)
 
     if(sum(cell_id_incs) > 0) {
@@ -122,7 +123,9 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
       # CLEAN THIS UP (I.E. if track is FALSE & see what happens when invalid ones go through)
       # this should only be for ones that were successful (i.e. within & populated)
       # were those contacts with a susceptible?  (better way to do this)
-      exp_inds <- !exposed$invalid & !exposed$outbounds & !is.na(exposed$row_id)
+
+      # Options is have sim_trans be able to handle this! & t_infectious
+      exp_inds <- which(!exposed$invalid & !exposed$outbounds & !is.na(exposed$row_id))
 
       if(sum(exp_inds) > 0) {
         out <- sim_trans(row_id = exposed$row_id[exp_inds],
@@ -130,10 +133,9 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
         exposed$contact[exp_inds] <- out$contact
         exposed$infected[exp_inds] <- out$infected
 
-        exposed$t_infectious <- 0
-        exposed$t_infectious[exposed$infected] <-
-          t_infectious(n = length(exposed$t_infectious[exposed$infected]),
-                       t_infected = exposed$t_infected[exposed$infected],
+        exposed$t_infectious <-
+          t_infectious(n = nrow(exposed),
+                       t_infected = exposed$t_infected,
                        days_in_step, serial_fun, params)
 
       } else {
@@ -162,8 +164,13 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     } else {
       exposed <- empty_dt
     }
-    if(t > 300) browser()
-    # Final balance ----
+
+
+    # print(paste("pop:", sum(S)))
+    # print(paste("empties:", sum(S == 0)))
+    #
+    # if(t %in% c(100, 200, 400, 800)) browser()
+    # # Final balance ----
     E_new <- tabulate(exposed$row_id[exposed$infected == TRUE], nbins = bins)
     E <- E + E_new
 
