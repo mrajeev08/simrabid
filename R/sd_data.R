@@ -34,7 +34,7 @@ get_sd_pops <- function(sd_shapefile, res_m, sd_census_data, death_rate_annual) 
   sd_census_data %>%
     distinct(cell_id, villcode) %>%
     mutate(villcode = match(villcode, sd_shapefile$villcode),
-           villcode_check = rast[match(cell_id, seq_len(ncell(rast)))]) %>%
+           villcode_check = rast[match(cell_id, seq_len(ncells(rast)))]) %>%
     filter(is.na(villcode_check)) -> update
 
   rast[update$cell_id] <- update$villcode
@@ -62,12 +62,12 @@ get_sd_pops <- function(sd_shapefile, res_m, sd_census_data, death_rate_annual) 
               start_pop = start_pop[1], villcode = villcode[1]) %>%
     group_by(villcode) %>%
     summarize(cell_id = sample(cell_id,
-                            size = start_pop[1],
-                            prob = dogs_total,
-                            replace = TRUE)) %>%
+                               size = start_pop[1],
+                               prob = dogs_total,
+                               replace = TRUE)) %>%
     group_by(cell_id) %>%
     summarize(start_pop = n()) %>%
-    tidyr::complete(cell_id = seq_len(ncell(rast))) %>%
+    tidyr::complete(cell_id = seq_len(ncells(rast))) %>%
     arrange(cell_id) -> start_pop
 
   # start pop (in right order)

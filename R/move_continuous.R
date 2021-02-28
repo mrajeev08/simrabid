@@ -15,9 +15,9 @@
 #' @param y_topl numeric, the top left y coordinate of the grid on which
 #'   movement is being simulated
 #' @param res_m numeric, the grid cell resolution in meters
-#' @param ncol numeric, the number of columns in the grid
-#' @param nrow numeric, the number of rows in the grid
-#' @param ncell numeric, the number of total cells (ncol * nrow)
+#' @param ncols numeric, the number of columns in the grid
+#' @param nrows numeric, the number of rows in the grid
+#' @param ncells numeric, the number of total cells (ncol * nrow)
 #' @param cells_block integer vector, the cell ids of grid cells where movements are invalid to,
 #'  for use with max_tries
 #'  @param cells_out_bounds integer vector, the cell ids of grid cells which are outside the bounds/
@@ -37,9 +37,9 @@
 #'
 sim_movement_continuous <-
   function(dist_m, angle, dispersal_fun, x0, y0, x_topl,
-           y_topl, res_m, ncol, nrow, ncell, cells_block, cells_out_bounds, path,
-           leave_bounds, allow_invalid, max_tries, sequential, params,
-           ...) {
+           y_topl, res_m, ncols, nrows, ncells, cells_block, cells_out_bounds, path,
+           leave_bounds, allow_invalid, max_tries, sequential, weights = NULL,
+           params, ...) {
 
     if(sequential) {
 
@@ -58,10 +58,10 @@ sim_movement_continuous <-
 
         out <- move_continuous(dist_m = dist_now, angle = angle_now,
                                x0, y0, x_topl, y_topl,
-                               res_m, ncol, nrow, ncell, cells_block,
+                               res_m, ncols, nrows, ncells, cells_block,
                                cells_out_bounds, path = 0)
 
-        accept <- accept(leave_bounds, allow_invalid, outbounds = out$outbounds,
+        accept <- valid(leave_bounds, allow_invalid, outbounds = out$outbounds,
                          invalid = out$invalid)
 
         tries <- tries + 1
@@ -71,11 +71,11 @@ sim_movement_continuous <-
 
       # get origin from infector if kernel movements
       out <- as.data.table(
-        move_continuous(dist_m, angle, x0, y0, x_topl, y_topl, res_m, ncol,
-                        nrow, ncell, cells_block, cells_out_bounds, path = 0)
+        move_continuous(dist_m, angle, x0, y0, x_topl, y_topl, res_m, ncols,
+                        nrows, ncells, cells_block, cells_out_bounds, path = 0)
       )
 
-      accept <- accept(leave_bounds, allow_invalid, outbounds = out$outbounds,
+      accept <- valid(leave_bounds, allow_invalid, outbounds = out$outbounds,
                        invalid = out$invalid)
 
       tries <- 0
@@ -89,12 +89,12 @@ sim_movement_continuous <-
             move_continuous(dist_m = dispersal_fun(retry, params),
                             angle = angle_fun(retry),
                             x0 = x0[inds], y0 = y0[inds],
-                            x_topl, y_topl, res_m, ncol, nrow, ncell,
+                            x_topl, y_topl, res_m, ncols, nrows, ncells,
                             cells_block,
                             cells_out_bounds,
                             path = 0L))
 
-        accept <- accept(leave_bounds, allow_invalid, outbounds = out$outbounds,
+        accept <- valid(leave_bounds, allow_invalid, outbounds = out$outbounds,
                          invalid = out$invalid)
 
         tries <- tries + 1
@@ -122,7 +122,7 @@ sim_movement_continuous <-
 #'
 move_continuous <- function(dist_m, angle,
                             x0, y0, x_topl,
-                            y_topl, res_m, ncol, nrow, ncell,
+                            y_topl, res_m, ncols, nrows, ncells,
                             cells_block, cells_out_bounds,
                             path) {
 
@@ -130,9 +130,9 @@ move_continuous <- function(dist_m, angle,
   y_coord <- (cos(angle) * dist_m) + y0
 
   # Get cell id
-  cell_id <- get_cellid(x_coord, y_coord, res_m, x_topl, y_topl, ncol, nrow)
+  cell_id <- get_cellid(x_coord, y_coord, res_m, x_topl, y_topl, ncols, nrows, ncells)
   invalid <- cell_id %in% cells_block
-  outbounds <- !(out$cell_id %in% 1:ncell) | cell_id %in% cells_out_bounds
+  outbounds <- !(cell_id %in% 1:ncells) | cell_id %in% cells_out_bounds
 
   return(list(x_coord = x_coord,
               y_coord = y_coord, cell_id = cell_id,
@@ -154,7 +154,7 @@ move_continuous <- function(dist_m, angle,
 #'
 #' @keywords move internal
 #'
-accept <- function(leave_bounds, allow_invalid,
+valid <- function(leave_bounds, allow_invalid,
                    outbounds, invalid) {
 
   accept <- rep(1, length(outbounds))

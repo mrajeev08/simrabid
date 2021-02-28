@@ -126,9 +126,9 @@ setup_sim <- function(tmax, start_pop, rast,
               I_dt = I_dt, empty_dt = empty_dt, nlocs = nlocs,
               loc_ids = loc_ids,
               start_pop = start_pop,
-              nrow = nrow(rast),
-              ncol = ncol(rast),
-              ncell = ncell(rast),
+              nrows = nrow(rast),
+              ncols = ncol(rast),
+              ncells = ncell(rast),
               x_topl = bbox(rast)[1, "min"],
               y_topl = bbox(rast)[2, "max"],
               x_coord = coords[, 1],
@@ -150,7 +150,7 @@ setup_sim <- function(tmax, start_pop, rast,
 init <- function(start_pop, start_vacc, I_seeds, I_dt, cell_ids,
                  admin_ids = NULL, row_ids,
                  bins, nlocs, x_coord, y_coord,
-                 params, incursion_fun) {
+                 params, incursion_fun, ncells) {
 
   # Starting pop + sus
   if(length(start_vacc) != 1 & is.integer(start_vacc)) {
@@ -162,18 +162,23 @@ init <- function(start_pop, start_vacc, I_seeds, I_dt, cell_ids,
   S <- start_pop - V
 
   # Seed cases at t0 and create data.table
-  cell_id_incs <- sample(cell_ids, I_seeds, replace = TRUE)
 
-  I_init <- add_incursions(cell_id_incs, cell_ids,
-                           admin_ids, row_ids,
-                           x_coord, y_coord, tstep = 0,
-                           counter = 0,
-                           days_in_step = 7)
+  if(I_seeds > 0) {
+    cell_id_incs <- sample(cell_ids, I_seeds, replace = TRUE)
 
-  I_dt[I_init$id] <- I_init # this should get updated in global environment
+    I_init <- add_incursions(cell_id_incs, cell_ids, ncells,
+                             admin_ids, row_ids,
+                             x_coord, y_coord, tstep = 1,
+                             counter = 0,
+                             days_in_step = 7)
+    I_dt[I_init$id] <- I_init # this should get updated in global environment
+    I <- tabulate(I_dt$row_id, nbins = bins)
+  } else {
+    I <- rep(0, bins)
+  }
+
 
   # Summarize and put into I!
-  I <- tabulate(I_dt$row_id, nbins = bins)
   E <- rep(0, bins)
 
   return(list(S = S, V = V, I = I, E = E, I_dt = I_dt, N = start_pop))

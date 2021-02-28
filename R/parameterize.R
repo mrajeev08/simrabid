@@ -16,7 +16,7 @@ nbinom_constrained <- function(n,
                                params = list(R0 = 1.2, k = 1),
                                max_secondaries = 100) {
 
-  secondaries <- rnbinom(n, size = params$k, mu = params$R0)
+  secondaries <- rnbinom(n, size = 1/params$k, mu = params$R0)
 
   # return constrained!
   return(ifelse(secondaries > max_secondaries,
@@ -138,8 +138,10 @@ beta_detect <- function(I_dt,
 beta_detect_monthly <- function(I_dt, tmax,
                                       params = list(detect_alpha = 80.1,
                                                     detect_beta = 8.9)) {
-  I_dt[, month := floor(tstep/4)][, detect_prob := rbeta(1, params$detect_alpha,
-                                                         params$detect_beta),
+  I_dt[, month := floor(t_infectious/4)][,
+                                         detect_prob := rbeta(1,
+                                                              params$detect_alpha,
+                                                              params$detect_beta),
                                   by = month]
   I_dt[, detected := rbinom(.N, size = 1, prob = detect_prob)]
 }

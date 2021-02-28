@@ -37,7 +37,7 @@ sim_trans <- function(row_id, S, E, I, V, bins, track = FALSE) {
   infected <- rep(FALSE, nexps)
 
   if(!track) {
-    # probability that a exposure was with a susceptible
+    # probability that a exposure was with a susceptible (can't have exp with yourself)
     N <- S + E + I + V
     probs <- ifelse(N > 0, S/N, 0)
 
@@ -128,7 +128,7 @@ sim_trans <- function(row_id, S, E, I, V, bins, track = FALSE) {
 #' @inheritParams accept
 #' @inheritParams sim_movement_continuous
 #' @param weights numeric vector, weights to give each grid cell for sampling moves
-#'  for use with sim_movement_prob; will be length ncell + 1,
+#'  for use with sim_movement_prob; will be length ncells + 1,
 #'  see \code{\link{cell_weights}}) for more details.
 #' defaults to NULL
 #' @param admin_ids if aggregating by the administrative unit (rather than grid cell), pass the rasterized
@@ -151,7 +151,7 @@ sim_bites <- function(secondaries, ids = I_now$id,
                       sim_movement = sim_movement_continuous,
                       dispersal_fun, res_m,
                       row_ids, cell_ids, cells_block, cells_out_bounds,
-                      nrow, ncol, ncell,
+                      nrows, ncols, ncells,
                       x_topl, y_topl,
                       weights = NULL, admin_ids = NULL,
                       sequential = TRUE, allow_invalid = TRUE,
@@ -164,7 +164,7 @@ sim_bites <- function(secondaries, ids = I_now$id,
   origin_y <- rep(y_coords, secondaries)
   nsim <- length(progen_ids)
   dist_m <- dispersal_fun(nsim, params)
-  if(is.null(weights))  angles <- NULL else angles <- angle_fun(nsim)
+  if(is.null(weights))  angles <- angle_fun(nsim) else angles <- NULL
 
   if(sequential) {
 
@@ -179,8 +179,8 @@ sim_bites <- function(secondaries, ids = I_now$id,
         y <- origin_y[i]
         path <- 1
       } else {
-        x <- move$x_coord
-        y <- move$y_coord
+        x <- out[[i - 1]]$x_coord
+        y <- out[[i - 1]]$y_coord
         path <- path + 1
       }
 
@@ -188,11 +188,11 @@ sim_bites <- function(secondaries, ids = I_now$id,
                                angle = angles[i],
                                dispersal_fun,
                                x0 = x, y0 = y, x_topl,
-                               y_topl, res_m, ncol,
-                               nrow, ncell,
+                               y_topl, res_m, ncols,
+                               nrows, ncells,
                                cells_block, cells_out_bounds, path,
                                leave_bounds, allow_invalid, max_tries,
-                               sequential, params)
+                               sequential, weights, params)
 
       }
 
@@ -206,11 +206,11 @@ sim_bites <- function(secondaries, ids = I_now$id,
                       angle = angles,
                       dispersal_fun,
                       x0 = origin_x, y0 = origin_y, x_topl,
-                      ncell,
-                      y_topl, res_m, ncol, nrow, cells_block, cells_out_bounds,
+                      y_topl, res_m, ncols, nrows, ncells,
+                      cells_block, cells_out_bounds,
                       path = 0,
                       leave_bounds, allow_invalid, max_tries,
-                      sequential, params)
+                      sequential, weights, params)
   }
 
   # add in ids
@@ -221,40 +221,62 @@ sim_bites <- function(secondaries, ids = I_now$id,
   out$infected <- FALSE
 
   # row ids to match to I/E mats (either corresponding to admin unit or cells)
-  out$row_id <- get_rowid(cell_id = out$cell_id, cell_ids, admin_ids, row_ids)
+  out$row_id <- get_rowid(cell_id = out$cell_id, cell_ids, admin_ids, row_ids, ncells)
 
+  # Make sure colum order matches that of I_dt (better way to do this)
+  setcolorder(out, c('id', 'cell_id', 'row_id', 'progen_id',
+                     'path', 'x_coord', 'y_coord', 'invalid',
+                         'outbounds', 't_infected'))
   return(out)
 
 }
 
 # want to do this vectorized @ the end
-cell_to_admin <- function(cell_id, admin_ids) {
+cell_to_admin <- function(cell_id, admin_ids, ncells) {
 
-  return(admin_ids[cell_id])
+  cell_id <- ifelse(cell_id %in% 1:ncells, cell_id, NA)
+
+  if(all(is.na(cell_id))) {
+    admin_id <- rep(NA, length(cell_id))
+  } else {
+    admin_id <- admin_ids[cell_id]
+  }
+
+  return(admin_id)
 
 }
 
 # getting cellid for use in movement funs (prob/continuous)
 get_cellid <- function(x_coord, y_coord, res_m, x_topl, y_topl,
-                       ncol, nrow) {
+                       ncols, nrows, ncells) {
 
   col <- ceiling((x_coord - x_topl) / res_m)
   row <- ceiling(-(y_coord - y_topl) / res_m)
-  cell_id <- row * ncol - (ncol - col)
-
+  cell_id <- row * ncols - (ncols - col)
+  cell_id <- ifelse(cell_id %in% 1:ncells, cell_id, ncells + 1) # means outside district
   return(cell_id)
 
 }
 
 # Getting row ids
-get_rowid <- function(cell_id, cell_ids, admin_ids, row_ids) {
+get_rowid <- function(cell_id, cell_ids, admin_ids, row_ids, ncells) {
 
   if(!is.null(admin_ids)) {
-    ids <- cell_to_admin(cell_id, admin_ids)
-    row_id <- row_ids[ids] # rows indexed by the admin unit
+
+    ids <- cell_to_admin(cell_id, admin_ids, ncells)
+
+    if(all(is.na(ids))) {
+      row_id <- rep(NA, length(ids))
+    } else {
+      row_id <- row_ids[ids] # rows indexed by the admin unit
+    }
   } else {
-    ids <- cell_id
-    row_id <- row_ids[match(cell_id, cell_ids)]
+
+    if(all(is.na(cell_id))) {
+      row_id <- rep(NA, length(cell_id))
+    } else {
+      row_id <- row_ids[match(cell_id, cell_ids)]
+    }
   }
   return(row_id)
 }

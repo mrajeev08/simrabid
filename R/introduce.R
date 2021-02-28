@@ -15,7 +15,7 @@
 #' @export
 #' @keywords incursions
 #'
-sim_incursions_hardwired <- function(ncell,
+sim_incursions_hardwired <- function(ncells,
                                      params = list(cell_ids = cell_ids_empirical,
                                                    tsteps = tstep_empirical),
                                      current_tstep = t, ...) {
@@ -78,7 +78,7 @@ sim_incursions_pois <- function(cell_ids,
 #' @import data.table
 #' @keywords incursions internal
 #'
-add_incursions <- function(cell_id_incs, cell_ids,
+add_incursions <- function(cell_id_incs, cell_ids, ncells,
                            admin_ids = NULL, row_ids,
                            x_coord, y_coord, tstep,
                            counter, days_in_step = 7) {
@@ -86,9 +86,9 @@ add_incursions <- function(cell_id_incs, cell_ids,
   n_incs <- length(cell_id_incs)
 
   # date infectious (this tstep just draw the day!)
-  t_infectious <- (sample(days_in_step, n_incs,
-                          replace = TRUE) + tstep)/days_in_step
-  row_id <- get_rowid(cell_id_incs, cell_ids, admin_ids, row_ids)
+  t_infectious <- sample(days_in_step, n_incs,
+                          replace = TRUE)/days_in_step + tstep
+  row_id <- get_rowid(cell_id_incs, cell_ids, admin_ids, row_ids, ncells)
 
   x_coord <- x_coord[cell_id_incs]
   y_coord <- y_coord[cell_id_incs]

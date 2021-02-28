@@ -13,7 +13,7 @@ get_ids <- function(x_coord, y_coord, rast, id_col) {
 
   cell_id <- cellFromXY(rast, cbind(x_coord, y_coord))
 
-  admin_id <- rast[][cell_id]
+  admin_id <- rast[cell_id]
   admin_code <- id_col[admin_id]
 
   # Use match nearest here to match to closest non-NA vals!
@@ -21,7 +21,7 @@ get_ids <- function(x_coord, y_coord, rast, id_col) {
     out_rast <- match_nearest(cell_ids = cell_id[is.na(admin_id)],
                               to_match = rast,
                               max_adjacent = 10)
-    admin_id <- out_rast[][cell_id]
+    admin_id <- out_rast[cell_id]
     admin_code <- id_col[admin_id]
 
     if(sum(is.na(admin_id)) > 0) {

@@ -13,21 +13,24 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                      leave_bounds = TRUE, max_tries = 100,
                      summary_funs = list(return_env = return_env),
                      track = TRUE,
-                     prob_revacc = 0.5,
                      weights = NULL,
                      row_probs = NULL,
-                     coverage = TRUE,
-                     break_threshold = 0.8) {
+                     coverage = FALSE,
+                     break_threshold = 0.8,
+                     by_admin = FALSE) {
 
   # pass the start_up objects into the function environment
   list2env(start_up, envir = environment())
 
   # initialize vaccination & infection
   list2env(init(start_pop, start_vacc, I_seeds, I_dt, cell_ids, admin_ids,
-                row_ids, bins, nlocs, x_coord, y_coord, params, incursion_fun),
+                row_ids, bins, nlocs, x_coord, y_coord, params, incursion_fun,
+                ncells),
            envir = environment())
 
   list2env(vacc_dt, envir = environment()) # spit out data table into environment as vectors
+
+  if(!by_admin) admin_id <- NULL
 
   for (t in seq_len(tmax)) {
 
@@ -60,7 +63,10 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     }
 
     # balance vaccinated
+    if (sum(is.na(S) | S < nvacc) > 0) browser()
+
     S <- S - nvacc
+
     V <- V + nvacc
 
     # Transmission ----
@@ -68,15 +74,20 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     cell_id_incs <- incursion_fun(cell_ids = cell_ids, params = params)
 
     if(sum(cell_id_incs) > 0) {
-      I_incs <- add_incursions(cell_id_incs, cell_ids, admin_ids,
+      I_incs <- add_incursions(cell_id_incs, cell_ids, ncells, admin_ids,
                                row_ids, x_coord, y_coord,
                                tstep = t, counter = max(I_dt$id),
                                days_in_step)
+
+      if(nrow(I_dt) <= max(I_incs$id)) {
+          I_dt <- double_I(I_dt)
+      }
 
       I_dt[I_incs$id] <- I_incs
 
     }
 
+    # Do these include the incursions?
     # exposed -> infectious (those in tstep) (better way to do this?)
     I_now <- I_dt[floor(t_infectious) == t & infected == TRUE]
 
@@ -102,33 +113,33 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                            dispersal_fun, res_m,
                            row_ids, cell_ids,
                            cells_block, cells_out_bounds,
-                           nrow, ncol, ncell,
+                           nrows, ncols, ncells,
                            x_topl, y_topl,
                            weights, admin_ids,
                            sequential, allow_invalid,
                            leave_bounds, max_tries,
                            params)
-
+      # CLEAN THIS UP (I.E. if track is FALSE & see what happens when invalid ones go through)
       # this should only be for ones that were successful (i.e. within & populated)
-      exp_inds <- !exposed$invalid & !exposed$outbounds
-      out <- sim_trans(row_id = exposed$row_id[exp_inds],
-                       S, E, I, V, bins,
-                       track)
-      exposed$contact[exp_inds] <- out$contact
-      exposed$infected[exp_inds] <- out$infected
-
       # were those contacts with a susceptible?  (better way to do this)
-      exposed$t_infectious <- 0
-      exposed$t_infectious[exposed$infected] <-
-        t_infectious(n = length(exposed$t_infectious[exposed$infected]),
-                     t_infected = exposed$t_infected[exposed$infected],
-                     days_in_step, serial_fun, params)
+      exp_inds <- !exposed$invalid & !exposed$outbounds & !is.na(exposed$row_id)
 
-      # Make sure colum order matches that of I_dt (better way to do this)
-      setcolorder(exposed, c('id', 'cell_id', 'row_id', 'progen_id',
-                             'path', 'x_coord', 'y_coord', 'invalid',
-                             'outbounds', 't_infected', 'contact', 'infected',
-                             't_infectious'))
+      if(sum(exp_inds) > 0) {
+        out <- sim_trans(row_id = exposed$row_id[exp_inds],
+                         S, E, I, V, bins, track)
+        exposed$contact[exp_inds] <- out$contact
+        exposed$infected[exp_inds] <- out$infected
+
+        exposed$t_infectious <- 0
+        exposed$t_infectious[exposed$infected] <-
+          t_infectious(n = length(exposed$t_infectious[exposed$infected]),
+                       t_infected = exposed$t_infected[exposed$infected],
+                       days_in_step, serial_fun, params)
+
+      } else {
+        exposed <- empty_dt
+      }
+
 
       # if not tracking outcomes, then only track infected
       if(!track) {
@@ -141,7 +152,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
 
       # Update I_dt
       if(nrow(exposed) > 0) {
-        if(nrow(I_dt) < max(exposed$id)) {
+        if(nrow(I_dt) <= max(exposed$id)) {
           I_dt <- double_I(I_dt)
         }
       }
@@ -151,13 +162,15 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     } else {
       exposed <- empty_dt
     }
-
+    if(t > 300) browser()
     # Final balance ----
     E_new <- tabulate(exposed$row_id[exposed$infected == TRUE], nbins = bins)
     E <- E + E_new
+
     if (sum(is.na(S) | S < E_new) > 0) browser()
 
     S <- S - E_new
+
     N <- S + E + I_loc + V
 
     # Update matrices ----
@@ -165,6 +178,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     E_mat[, t] <- E
     I_mat[, t] <- I
     V_mat[, t] <- V
+    N_mat[, t] <- N
 
     prop_start_pop <- sum(N, na.rm = TRUE)/sum(start_pop, na.rm = TRUE)
 
@@ -173,6 +187,9 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     }
 
   }
+
+  # Filter to ones that
+  I_dt <- I_dt[id != 0] # incursions + cases seeded locally
 
   # Reporting model (adds a reported column to the I data.table) (modifies in place!)
   observe_fun(I_dt, params) # change this so it operates within data.table?

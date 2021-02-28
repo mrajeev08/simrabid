@@ -11,10 +11,9 @@
 #'
 sim_movement_prob <-
   function(dist_m, angle = NULL, dispersal_fun, x0, y0, x_topl,
-           y_topl, res_m, ncol, nrow, ncell, cells_block, cells_out_bounds, path,
-           leave_bounds, allow_invalid, max_tries, sequential, weights,
+           y_topl, res_m, ncols, nrows, ncells, cells_block, cells_out_bounds, path,
+           leave_bounds, allow_invalid, max_tries, sequential, weights = NULL,
            params, ...) {
-
 
     if(sequential) {
 
@@ -29,12 +28,12 @@ sim_movement_prob <-
           dist_now <- dispersal_fun(1, params)
         }
 
-        out <- movement_prob(dist_m = dist_now, weights, x0, y0, x_topl, y_topl, ncell,
-                             res_m, ncol, nrow, path,
+        out <- movement_prob(dist_m = dist_now, weights, x0, y0, x_topl, y_topl, ncells,
+                             res_m, ncols, nrows, path,
                              leave_bounds, cells_block,
                              cells_out_bounds)
 
-        accept <- accept(leave_bounds, allow_invalid, outbounds = out$outbounds,
+        accept <- valid(leave_bounds, allow_invalid, outbounds = out$outbounds,
                          invalid = out$invalid)
 
         tries <- tries + 1
@@ -58,12 +57,12 @@ sim_movement_prob <-
           }
 
           out_i <- movement_prob(dist_m = dist_now, weights, x0 = x0[i],
-                                 y0 = x0[i], x_topl, y_topl, ncell,
-                                 res_m, ncol, nrow, path,
+                                 y0 = y0[i], x_topl, y_topl, ncells,
+                                 res_m, ncols, nrows, path,
                                  leave_bounds, cells_block,
                                  cells_out_bounds)
 
-          accept <- accept(leave_bounds, allow_invalid, outbounds = out_i$outbounds,
+          accept <- valid(leave_bounds, allow_invalid, outbounds = out_i$outbounds,
                            invalid = out_i$invalid)
 
           tries <- tries + 1
@@ -92,7 +91,7 @@ sim_movement_prob <-
 #' or allow_invalid are false respectively). Covaraites and parameters can be passed,
 #' but these must include a covariate length 1 equal to 1L and a parameter estimate
 #' of length 1 corresponding to the model intercept. The last weight is for those
-#' cell ids that fall outside the range of possible cell ids (i.e. not in 1:ncell).
+#' cell ids that fall outside the range of possible cell ids (i.e. not in 1:ncells).
 #'
 #' @param covars list of vectors corresponding to covariates for each cell,
 #'  one should be the intercept (valued at 1)
@@ -100,19 +99,19 @@ sim_movement_prob <-
 #'  one should be length 1 and correspond to the intercept
 #' @inheritParams sim_bites
 #'
-#' @return a vector of weights of length ncell + 1
+#' @return a vector of weights of length ncells + 1
 #'
 #' @export
 #'
 #' @example
 #' covars <- list(pop = rpois(100, 100), proximity_to_road = runif(100, 0, 10), intercept = 1)
 #' params <- list(pop = 1.2, proximity_to_road = -0.5, intercept = -5)
-#' weights <- cell_weights(covars = covars, params = params, ncell = 100,
+#' weights <- cell_weights(covars = covars, params = params, ncells = 100,
 #'                         leave_bounds = TRUE, allow_invalid = FALSE,
 #'                         cells_block = c(1, 35, 20), cells_out_bounds = 90:100)
 cell_weights <- function(covars = list(0),
                          params = list(0),
-                         ncell,
+                         ncells,
                          leave_bounds,
                          allow_invalid,
                          cells_block,
@@ -122,7 +121,7 @@ cell_weights <- function(covars = list(0),
   weights <- plogis(Reduce('+', Map('*', covars, params)))
 
   if(length(weights) == 1) {
-    weights <- rep(weights, ncell)
+    weights <- rep(weights, ncells)
   }
 
   if(!allow_invalid) {
@@ -140,8 +139,8 @@ cell_weights <- function(covars = list(0),
   }
 
 
-  if(length(weights) != ncell + 1) {
-    stop("Cell weights length should be ncell(rast) + 1!")
+  if(length(weights) != ncells + 1) {
+    stop("Cell weights length should be ncells(rast) + 1!")
   }
 
 
@@ -152,14 +151,13 @@ cell_weights <- function(covars = list(0),
 #' Subset weights of cells to the candidate cell ids
 #'
 #' @inheritParams sim_bites
-#'
+#' Weights should be length ncells + 1
 #' @return a vector of weights corresponding to the cell_ids passed through
 #' @keywords move internal
 #'
 #'
-get_cellweights <- function(weights, cell_ids, ncell) {
+get_cellweights <- function(weights, cell_ids) {
 
-  cell_ids[cell_ids %in% 1:ncell] <- length(weights) # means not inside raster
   weights <- weights[cell_ids]
 
   return(weights)
@@ -178,23 +176,24 @@ get_cellweights <- function(weights, cell_ids, ncell) {
 #'
 movement_prob <- function(dist_m,
                           weights, x0, y0, x_topl, y_topl,
-                          ncell,
-                          res_m, ncol, nrow, path,
+                          ncells,
+                          res_m, ncols, nrows, path,
                           leave_bounds, cells_block,
                           cells_out_bounds) {
 
   # Options for movement at distance x (should handle weights at the top)
   # Should return a list!
-  opts <- cells_away(x0, y0, dist_m, res_m, ncol, nrow, x_topl, y_topl)
+  opts <- cells_away(x0, y0, dist_m, res_m, ncols, nrows, x_topl, y_topl,
+                     ncells)
 
   # Get the weights for each cell id
-  weights <- get_cellweights(weights, cell_ids, ncell)
+  weights <- get_cellweights(weights, opts$cell_id)
 
   # Pick the cell to move to based on probabilities
   opt_n <- length(opts$cell_id)
 
   if(opt_n == 1) { # if only one option, then return that option
-    out <- opts
+    out <- unlist(opts)
   } else {
     if(sum(weights) == 0) { # if all weights == 0, don't do prob
       out <- transpose(opts)[[sample(opt_n, size = 1)]]
@@ -203,11 +202,11 @@ movement_prob <- function(dist_m,
     }
   }
 
-  out$invalid <- out$cell_id %in% cells_block
-  out$outbounds <- !(out$cell_id %in% 1:ncell) | out$cell_id %in% cells_out_bounds
-  out$path <- path
+  invalid <- out[1] %in% cells_block
+  outbounds <- !(out[1] %in% 1:ncells) | out[1] %in% cells_out_bounds
 
-  return(out)
+  return(list(cell_id = out[1], x_coord = out[2], y_coord = out[3],
+              invalid = invalid, outbounds = outbounds, path = path))
 
 }
 
@@ -218,8 +217,8 @@ movement_prob <- function(dist_m,
 #' @return a list of the candidate cell_ids and the x and y coords of the movement
 #' @keywords move internal
 #'
-cells_away <- function(x0, y0, dist_m, res_m, ncol, nrow,
-                       x_topl, y_topl) {
+cells_away <- function(x0, y0, dist_m, res_m, ncols, nrows,
+                       x_topl, y_topl, ncells) {
 
   n_away <- floor(dist_m/res_m) * 4
   if(n_away == 0) n_away <- 4
@@ -231,7 +230,8 @@ cells_away <- function(x0, y0, dist_m, res_m, ncol, nrow,
   y_coord <- (cos(angle) * dist_m) + y0
 
   # Get cell ids
-  cell_id <- get_cellid(x_coord, y_coord, res_m, x_topl, y_topl, ncol, nrow)
+  cell_id <- get_cellid(x_coord, y_coord, res_m,
+                        x_topl, y_topl, ncols, nrows, ncells)
 
   return(list(cell_id = cell_id, x_coord = x_coord, y_coord = y_coord))
 

@@ -20,7 +20,7 @@
 # data = inc_hist + breaks (which should be 1 longer than length of inc_hist)
 # data = # of cases per cell (order by the cell_id)
 # do this with example of different sizes & benchmark
-inc_stats <- function(I_dt, tmax, ncell, data) {
+inc_stats <- function(I_dt, tmax, ncells, data) {
 
   # filter I_dt to successful transmission events & detected cases
 
@@ -62,7 +62,7 @@ inc_stats <- function(I_dt, tmax, ncell, data) {
   temp_ss <- sum((I_ts$N - data$cases_by_month)^2)
 
   # spatial
-  I_cell <- I_dt[, .N, keyby = cell_id][data.table(cell_id = 1:ncell)][cell_id %in% 1:ncell]
+  I_cell <- I_dt[, .N, keyby = cell_id][data.table(cell_id = 1:ncells)][cell_id %in% 1:ncells]
   spat_rmse <- sqrt(mean((I_cell$N - data$cases_by_cell)^2))
   spat_ss <- sum((I_cell$N - data$cases_by_cell)^2)
 
