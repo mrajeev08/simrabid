@@ -99,7 +99,7 @@ get_latest <- function(path, pattern) {
 # safe sample
 
 #' export
-safe_sample <- function(opts, size, prob, replace) {
+safe_sample <- function(opts, size, prob = NULL, replace) {
 
   if(length(opts) == 1) {
     return(rep(opts, size))

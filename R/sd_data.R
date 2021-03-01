@@ -12,7 +12,7 @@
 #'
 get_sd_pops <- function(sd_shapefile, res_m, sd_census_data, death_rate_annual) {
 
-  browser()
+
   sd_shapefile$id_col <- 1:nrow(sd_shapefile)
   rast <-
     simrabid::setup_space(shapefile = sd_shapefile,
