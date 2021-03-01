@@ -1,0 +1,55 @@
+---
+title: "Benchmarking across scales & parameters"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Benchmarking across scales & parameters}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(raster)
+library(data.table)
+library(rgdal)
+library(rmapshaper)
+library(fasterize)
+library(patchwork)
+devtools::load_all()
+```
+
+## Testing speed & model checks across scales & param estimate
+```{r}
+# R0 prior (exp of uniform -0.5 to 0.5 translates to 0.6 - 1.6 or norm centered around 1)
+range(exp(rnorm(10000, mean = 0, sd = 0.2)))
+# k prior (centered around 1?)
+range(exp(rnorm(1000, mean = 0, sd = 2)))
+# incursions
+range(exp(rnorm(1000, mean = 0, sd = 1)))
+
+
+# candidates 
+test_df <- expand.grid(leave_bounds = c(TRUE, FALSE), 
+                       allow_invalid = c(TRUE, FALSE), 
+                       movement = c("prob", "continuous"),
+                       res_m = c(1000, 2000, 4000, "vill"))
+                       
+# 1000 sims for each across the priors
+
+# output = timings + distance kernel + prop of movements that were to invalid/out-of-bounds
+
+# for a specific estimate (i.e. what I think it is) do 1000 sims and get timeseries
+
+
+```
+
+## for ones that are reasonable test the summary stats
