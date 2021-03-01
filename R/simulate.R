@@ -28,31 +28,30 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                 ncells),
            envir = environment())
 
-  list2env(vacc_dt, envir = environment()) # spit out data table into environment as vectors
+  # spit out data table into environment as vectors
+  list2env(vacc_dt, envir = environment())
 
   if(!by_admin) admin_ids <- NULL
+  if(by_admin) loc_ids <- row_ids
 
   for (t in seq_len(tmax)) {
 
     # Demography -----
+
     # Vaccinated class
-    V <- V - rbinom(nlocs, size = V, prob = death_prob) # die first
-    waning <- rbinom(nlocs, size = V, prob = waning_prob)
+    V <- V - rbinom(bins, size = V, prob = death_prob) # die first
+    waning <- rbinom(bins, size = V, prob = waning_prob)
     V <- V - waning
 
     # Susceptible class
-    if (sum(is.na(S) | S < 0) > 0) browser()
-
-    S <- S - rbinom(nlocs, size = S, prob = death_prob) + waning
-    S <- S + rbinom(nlocs, size = S + V, prob = birth_prob)
-
-    if (sum(is.na(S) | S < 0) > 0) browser()
-
+    S <- S - rbinom(bins, size = S, prob = death_prob) + waning
+    S <- S + rbinom(bins, size = S + V, prob = birth_prob)
 
     # Vaccination ----
     inds <- vacc_times == t
 
     if (sum(inds) > 0) {
+
       nvacc <- sim_vacc(vacc_est = vacc_est[inds],
                         vacc_locs = vacc_locs[inds],
                         S, V, N, loc_ids, bins,
@@ -63,15 +62,12 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     }
 
     # balance vaccinated
-    if (sum(is.na(S) | S < nvacc) > 0) browser()
-
     S <- S - nvacc
-
     V <- V + nvacc
 
     # Transmission ----
-    # incursions
 
+    # incursions
     cell_id_incs <- incursion_fun(cell_ids = cell_ids, params = params)
 
     if(sum(cell_id_incs) > 0) {
@@ -88,12 +84,12 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
 
     }
 
-    # Do these include the incursions?
-    # exposed -> infectious (those in tstep) (better way to do this?)
-    I_now <- I_dt[floor(t_infectious) == t & infected == TRUE]
+    # exposed -> infectious (those in tstep)
+    I_now <- I_dt[floor(t_infectious) == t & infected]
 
     # Balance I & E class
     I <- tabulate(I_now$row_id, nbins = bins)
+    # only local cases included
     I_loc <- tabulate(I_now$row_id[I_now$progen_id > 0], nbins = bins)
     E <- E - I_loc
 
@@ -120,16 +116,15 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                            sequential, allow_invalid,
                            leave_bounds, max_tries,
                            params)
-      # CLEAN THIS UP (I.E. if track is FALSE & see what happens when invalid ones go through)
-      # this should only be for ones that were successful (i.e. within & populated)
-      # were those contacts with a susceptible?  (better way to do this)
 
-      # Options is have sim_trans be able to handle this! & t_infectious
+      # Currently handling this in the simulate function (move to sim_trans)
       exp_inds <- which(!exposed$invalid & !exposed$outbounds & !is.na(exposed$row_id))
 
-      if(sum(exp_inds) > 0) {
+      if(length(exp_inds) > 0) {
+
         out <- sim_trans(row_id = exposed$row_id[exp_inds],
                          S, E, I, V, bins, track)
+
         exposed$contact[exp_inds] <- out$contact
         exposed$infected[exp_inds] <- out$infected
 
@@ -166,15 +161,10 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
     }
 
 
-    # print(paste("pop:", sum(S)))
-    # print(paste("empties:", sum(S == 0)))
-    #
-    # if(t %in% c(100, 200, 400, 800)) browser()
-    # # Final balance ----
+    # Final balance ----
     E_new <- tabulate(exposed$row_id[exposed$infected == TRUE], nbins = bins)
-    E <- E + E_new
 
-    if (sum(is.na(S) | S < E_new) > 0) browser()
+    E <- E + E_new
 
     S <- S - E_new
 
@@ -195,13 +185,14 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
 
   }
 
-  # Filter to ones that
-  I_dt <- I_dt[id != 0] # incursions + cases seeded locally
+  # Filter to incursions + cases seeded locally
+  I_dt <- I_dt[id != 0]
 
-  # Reporting model (adds a reported column to the I data.table) (modifies in place!)
-  observe_fun(I_dt, params) # change this so it operates within data.table?
+  # Observation model (adds a detected column to the I data.table)
+  # (modifies I_dt in place)
+  observe_fun(I_dt, params)
 
-  # Summary functions which returns list of objs (or list of lists)
+  # Summary functions which returns list of outputs
   out <- lapply(summary_funs, function(x) x())
 
   return(out)

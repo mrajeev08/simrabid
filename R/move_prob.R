@@ -140,7 +140,7 @@ cell_weights <- function(covars = list(0),
 
 
   if(length(weights) != ncells + 1) {
-    stop("Cell weights length should be ncells(rast) + 1!")
+    stop("Cell weights length should be ncell(rast) + 1!")
   }
 
 

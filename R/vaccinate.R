@@ -137,6 +137,7 @@ sim_campaigns <- function(locs, campaign_prob = 0.5,
 sim_vacc <- function(vacc_est, vacc_locs, S, V, N, loc_ids, bins,
                      row_ids, row_probs = NULL, coverage = TRUE) {
 
+
   # make & join up data tables
   dem_now <- data.table(S, V, N, loc_ids, row_ids, row_probs)
   dem_now <- dem_now[loc_ids %in% vacc_locs & S > 0]
@@ -256,6 +257,7 @@ sim_campaigns <- function(locs, campaign_prob = 0.5,
                           sample_tstep = function(n) {
                             sample.int(52, n, replace = TRUE)
                           }) {
+
   vacc_dt <- data.table(
     vacc_locs = rep(locs, each = sim_years),
     years = rep(1:sim_years, length(locs))
