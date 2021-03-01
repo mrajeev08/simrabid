@@ -12,7 +12,7 @@
 #'
 get_sd_pops <- function(sd_shapefile, res_m, sd_census_data, death_rate_annual) {
 
-
+  browser()
   sd_shapefile$id_col <- 1:nrow(sd_shapefile)
   rast <-
     simrabid::setup_space(shapefile = sd_shapefile,
@@ -61,10 +61,10 @@ get_sd_pops <- function(sd_shapefile, res_m, sd_census_data, death_rate_annual) 
     summarize(dogs_total = sum(adult_dogs + pups, na.rm = TRUE),
               start_pop = start_pop[1], villcode = villcode[1]) %>%
     group_by(villcode) %>%
-    summarize(cell_id = sample(cell_id,
-                               size = start_pop[1],
-                               prob = dogs_total,
-                               replace = TRUE)) %>%
+    summarize(cell_id = safe_sample(opts = cell_id,
+                                    size = start_pop[1],
+                                    prob = dogs_total,
+                                    replace = TRUE)) %>%
     group_by(cell_id) %>%
     summarize(start_pop = n()) %>%
     tidyr::complete(cell_id = seq_len(ncell(rast))) %>%

@@ -24,7 +24,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
 
   # initialize vaccination & infection
   list2env(init(start_pop, start_vacc, I_seeds, I_dt, cell_ids, admin_ids,
-                row_ids, bins, nlocs, x_coord, y_coord, params, incursion_fun,
+                row_ids, bins, x_coord, y_coord, params, incursion_fun,
                 ncells),
            envir = environment())
 
@@ -32,7 +32,6 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
   list2env(vacc_dt, envir = environment())
 
   if(!by_admin) admin_ids <- NULL
-  if(by_admin) loc_ids <- row_ids
 
   for (t in seq_len(tmax)) {
 
@@ -123,7 +122,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
       if(length(exp_inds) > 0) {
 
         out <- sim_trans(row_id = exposed$row_id[exp_inds],
-                         S, E, I, V, bins, track)
+                         S, E, I, V, bins)
 
         exposed$contact[exp_inds] <- out$contact
         exposed$infected[exp_inds] <- out$infected

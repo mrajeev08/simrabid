@@ -76,19 +76,22 @@ setup_sim <- function(tmax, start_pop, rast,
 
   # only tracking populated cells within district (no new pops in new cells)
   cell_ids <- all_inds$track_inds
-  loc_ids <- rast[cell_ids]
   coords <- raster::coordinates(rast)
-  nlocs <- length(cell_ids)
 
   if(by_admin) {
-    bins <- max(rast[], na.rm = TRUE)
+
     # need to group by id and spit back out
     pop_dt <- data.table(admin_id = rast[], start_pop = start_pop)
     start_pop <- pop_dt[!is.na(admin_id)][, .(pop = sum(start_pop, na.rm = TRUE)),
                                           by = "admin_id"]$pop
+    bins <- max(rast[], na.rm = TRUE)
+    loc_ids <- 1:bins
+
   } else {
     start_pop <- start_pop[cell_ids]
-    bins <- nlocs
+    bins <- length(cell_ids)
+    loc_ids <- rast[cell_ids]
+
   }
 
   if(length(birth_rate_annual) > 1 & !by_admin) {
@@ -123,7 +126,7 @@ setup_sim <- function(tmax, start_pop, rast,
               V_mat = V_mat, N_mat = N_mat, cell_ids = cell_ids,
               cells_block = all_inds$block_inds,
               cells_out_bounds = all_inds$out_inds,
-              I_dt = I_dt, empty_dt = empty_dt, nlocs = nlocs,
+              I_dt = I_dt, empty_dt = empty_dt,
               loc_ids = loc_ids,
               start_pop = start_pop,
               nrows = nrow(rast),
@@ -149,7 +152,7 @@ setup_sim <- function(tmax, start_pop, rast,
 #'
 init <- function(start_pop, start_vacc, I_seeds, I_dt, cell_ids,
                  admin_ids = NULL, row_ids,
-                 bins, nlocs, x_coord, y_coord,
+                 bins, x_coord, y_coord,
                  params, incursion_fun, ncells) {
 
   # Starting pop + sus
@@ -164,7 +167,7 @@ init <- function(start_pop, start_vacc, I_seeds, I_dt, cell_ids,
   # Seed cases at t0 and create data.table
 
   if(I_seeds > 0) {
-    cell_id_incs <- sample(cell_ids, I_seeds, replace = TRUE)
+    cell_id_incs <- safe_sample(opts = cell_ids, size = I_seeds, replace = TRUE)
 
     I_init <- add_incursions(cell_id_incs, cell_ids, ncells,
                              admin_ids, row_ids,

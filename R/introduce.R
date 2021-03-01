@@ -5,17 +5,19 @@
 #'
 #' @inheritSection sim_incursions_pois Section details
 #'
-#' @inherit sim_incursions_pois
+#' @param cell_ids a dummy variable passed to keep consistent with other
+#'  sim incursion function
 #' @param params consisting of two numeric vectors:
 #'  the row ids of the known incursions (`row_ids`) and
 #'  the timestep at which the known incursions should be seeded (`tsteps`)
-#' @param current_tstep the current timestep in the simulation
+#' @param current_tstep the current timestep in the simulation, set to t so
+#'  that it will be called by default in the function environment
 #'
 #' @inheritSection sim_incursions_pois Section return
 #' @export
 #' @keywords incursions
 #'
-sim_incursions_hardwired <- function(ncells,
+sim_incursions_hardwired <- function(cell_ids,
                                      params = list(cell_ids = cell_ids_empirical,
                                                    tsteps = tstep_empirical),
                                      current_tstep = t, ...) {
@@ -30,17 +32,17 @@ sim_incursions_hardwired <- function(ncells,
 #'
 #' \code{sim_incursions_pois} simulates incursions from a poisson distribution.
 #'
-#' These functions are passed as an argument to the paramter `incursion_fun` in
+#' These functions are passed as an argument to the parameter `incursion_fun` in
 #' \code{\link{simrabid}} and can be customized. They must include arguments
-#' for `nlocs` and `params` (if you want to change the parameter
+#' for `cell_ids` and `params` (if you want to change the parameter
 #' values or you can fix them within the function).
 #'
-#' @param nlocs the total number of grid cells being simulated
+#' @param cell_ids the cells to sample incursions to
 #' @param params a list with a named parameter `iota`, the number of incursions
 #'   on average each week
 #'
-#' @return numeric vector of length `nlocs`, the number of incursions to add to
-#' each grid cell being simulated
+#' @return numeric vector of cell_ids where incursions occured
+#'
 #' @export
 #' @keywords incursions
 #'
@@ -52,7 +54,7 @@ sim_incursions_pois <- function(cell_ids,
   n_incs <- rpois(1, params$iota)
 
   # sample cell ids by bins
-  cell_id <- sample(cell_ids, n_incs, replace = TRUE)
+  cell_id <- safe_sample(opts = cell_ids, size = n_incs, replace = TRUE)
 
   return(cell_id)
 }

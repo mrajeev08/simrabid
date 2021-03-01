@@ -44,7 +44,7 @@ arg_test <- expand_grid(sequential = c(TRUE, FALSE),
 
 # set up the loop here (starting with the resolution decision)
 # 1. get pop aggregated to the correct resolution
-out <- get_sd_pops(sd_shapefile, res_m = 1000, 
+out <- get_sd_pops(sd_shapefile, res_m = 4000, 
                    sd_census_data, death_rate_annual = 0.48)
   
 # vacc data remains constant throughout this
@@ -58,8 +58,8 @@ start_up <- setup_sim(tmax = 52* (2020 - 2002),
                       death_rate_annual = out$death_rate_annual, 
                       birth_rate_annual = out$birth_rate_annual,
                       waning_rate_annual = 1/3,
-                      step = 52, 
-                      by_admin = TRUE)
+                      step = 52,
+                      by_admin = FALSE)
 weights <- cell_weights(covars = list(0),
                         params = list(0),
                         start_up$ncell, 
@@ -78,16 +78,16 @@ test <- simrabid(start_up, start_vacc = 0.2, I_seeds = 3, vacc_dt,
                  dispersal_fun = steps_weibull,
                  secondary_fun = nbinom_constrained,
                  incursion_fun = sim_incursions_pois,
-                 movement_fun = sim_movement_continuous,
+                 movement_fun = sim_movement_prob,
                  sequential = TRUE, allow_invalid = TRUE,
                  leave_bounds = TRUE, max_tries = 100,
                  summary_funs = list(return_env = return_env),
                  track = TRUE,
-                 weights = NULL,
+                 weights = weights,
                  row_probs = NULL,
                  coverage = FALSE,
                  break_threshold = 0.8, 
-                 by_admin = TRUE) 
+                 by_admin = FALSE) 
 
 ```
 

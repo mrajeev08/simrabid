@@ -15,18 +15,16 @@
 #'
 #' @param row_id numeric vector (length >= 1) the row ids corresponding to the grid cell of the exposure (one value per exposure)
 #' @param S,E,I,V numeric vector of state variables (i.e. # of individuals in
-#'   each class in each grid cell) of length nlocs
+#'   each class in each grid cell) of length bins
 #' @param bins numeric, either the number of grid cells total OR
 #'  the number of admin units, for when simulating at admin rather
 #'  than grid cell level
-#' @param track boolean, whether to explicitly track the outcome of each exposure or
-#'   to only track whether successful or not (i.e. with a suscpetible or no). See details.
 #'
 #' @return a list of two vectors (contact and infected) of same length as `row_id`.
-#'  contact will be NULL if track = FALSE.
+#'
 #' @keywords transmit internal
 #'
-sim_trans <- function(row_id, S, E, I, V, bins, track = FALSE) {
+sim_trans <- function(row_id, S, E, I, V, bins) {
 
   exps <- tabulate(row_id, nbins = bins)
   id_list <- which(exps > 0)
@@ -36,55 +34,25 @@ sim_trans <- function(row_id, S, E, I, V, bins, track = FALSE) {
   contact <- rep("M", nexps)
   infected <- rep(FALSE, nexps)
 
-  if(!track) {
-    # probability that a exposure was with a susceptible (can't have exp with yourself)
-    N <- S + E + I + V
-    probs <- ifelse(N > 0, S/N, 0)
+  for(i in seq_along(id_list)) {
+    # Sample the states
+    ind <- id_list[i]
 
-    exps_out <- rbinom(n = length(exps), size = exps,
-                       prob = probs)
+    # taking out the infectious dog doing the biting (I[i] - 1)
+    states <- rep(c("S", "E", "I", "V"),
+                  c(S[ind], E[ind],
+                    ifelse(I[ind] > 0, I[ind] - 1, I[ind]), V[ind]))
 
-    # Number of successful exposures can't be greater than the susceptibles available
-    # Issue when N is small
-    success <- ifelse(exps_out[id_list] > S[id_list], S[id_list],
-                      exps_out[id_list])
+    sample_length <- length(states)
 
-    for(i in seq_along(id_list)) {
-      if(success[i] > 0) {
-        inf_inds <- which(row_id == id_list[i])
-        if(length(inf_inds) > success[i]) {
-          infected[sample(inf_inds,
-                          success[i],
-                          replace = FALSE)] <- TRUE
-        } else {
-          infected[inf_inds] <- TRUE
-        }
-
-      }
-
-    }
-
-  } else {
-
-    for(i in seq_along(id_list)) {
-      # Sample the states
-      ind <- id_list[i]
-      # taking out the infectious dog doing the biting (I[i] - 1)
-      states <- rep(c("S", "E", "I", "V"),
-                    c(S[ind], E[ind],
-                      ifelse(I[ind] > 0, I[ind] - 1, I[ind]), V[ind]))
-
-      sample_length <- length(states)
-
-      if(sample_length > 0) {
-        rows <- which(row_id == ind)
-        sample_length <- ifelse(exps[ind] > sample_length,
-                                sample_length, exps[ind])
-        rows <- rows[1:sample_length]
-        contact[rows] <- sample(states, size = sample_length,
-                                replace = FALSE)
-        infected[contact == "S" & !is.na(contact)] <- TRUE
-      }
+    if(sample_length > 0) {
+      rows <- which(row_id == ind)
+      sample_length <- ifelse(exps[ind] > sample_length,
+                              sample_length, exps[ind])
+      rows <- rows[1:sample_length]
+      contact[rows] <- sample(states, size = sample_length,
+                              replace = FALSE)
+      infected[contact == "S" & !is.na(contact)] <- TRUE
     }
   }
 

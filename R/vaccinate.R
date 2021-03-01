@@ -107,7 +107,7 @@ sim_campaigns <- function(locs, campaign_prob = 0.5,
 #'
 #' To Do:
 #' - Tests/ catches for lengths? This might slow things down! (maybe should be higher level test/catch)
-#' - Tests: return should be same length as nlocs, should be positive integer & non NA
+#' - Tests: return should be same length as bins, should be positive integer & non NA
 #'
 #' @param vacc_est numeric vector of coverage estimates (either [0, 1] or the number vaccinated)
 #' @param vacc_locs vector of numeric or character ids of same length as `vacc_est`,
@@ -128,7 +128,7 @@ sim_campaigns <- function(locs, campaign_prob = 0.5,
 #'   are translated to numbers with rbinom and then allocated, if FALSE then number
 #'   vaccinated are allocated (constrained to the available susceptible dogs)
 #'
-#' @return a numeric vector of length **nlocs** of the number of currently vaccinated
+#' @return a numeric vector of length **bins** of the number of currently vaccinated
 #' individuals in each grid cell
 #'
 #' @import data.table
@@ -173,10 +173,10 @@ sim_vacc <- function(vacc_est, vacc_locs, S, V, N, loc_ids, bins,
 
     # sample locations by the number of available susceptibles
     # and optionally weight that sampling by the probability of vacc in that cell
-    vacc_ids <- sus_dt[, .(row_id = sample(rep(row_ids, S),
-                                           size = nvacc[1],
-                                           replace = FALSE,
-                                           prob = rep(row_probs, S))),
+    vacc_ids <- sus_dt[, .(row_id = safe_sample(opts =rep(row_ids, S),
+                                                size = nvacc[1],
+                                                replace = FALSE,
+                                                prob = rep(row_probs, S))),
                        by = "loc_ids"]
 
     # update & return V
@@ -296,7 +296,7 @@ sim_campaigns <- function(locs, campaign_prob = 0.5,
 #'
 #' To Do:
 #' - Tests/ catches for lengths? This might slow things down! (maybe should be higher level test/catch)
-#' - Tests: return should be same length as nlocs, should be positive integer & non NA
+#' - Tests: return should be same length as bins, should be positive integer & non NA
 #'
 #' @param vacc_est numeric vector of coverage estimates (either [0, 1] or the number vaccinated)
 #' @param vacc_locs vector of numeric or character ids of same length as `vacc_est`,
@@ -317,7 +317,7 @@ sim_campaigns <- function(locs, campaign_prob = 0.5,
 #'   are translated to numbers with rbinom and then allocated, if FALSE then number
 #'   vaccinated are allocated (constrained to the available susceptible dogs)
 #'
-#' @return a numeric vector of length **nlocs** of the number of currently vaccinated
+#' @return a numeric vector of length **bins** of the number of currently vaccinated
 #' individuals in each grid cell
 #'
 #' @import data.table
@@ -361,10 +361,10 @@ sim_vacc <- function(vacc_est, vacc_locs, S, V, N, loc_ids, bins,
 
     # sample locations by the number of available susceptibles
     # and optionally weight that sampling by the probability of vacc in that cell
-    vacc_ids <- sus_dt[, .(row_id = sample(as.character(rep(row_ids, S)),
-                                           size = nvacc[1],
-                                           replace = FALSE,
-                                           prob = rep(row_probs, S))),
+    vacc_ids <- sus_dt[, .(row_id = safe_sample(opts = rep(row_ids, S),
+                                                size = nvacc[1],
+                                                replace = FALSE,
+                                                prob = rep(row_probs, S))),
                        by = "loc_ids"]
 
     # update & return V

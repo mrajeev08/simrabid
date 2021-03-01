@@ -96,3 +96,17 @@ get_latest <- function(path, pattern) {
   list.files(path, full.names = TRUE)[grep(pattern, list.files(path))][1]
 }
 
+# safe sample
+
+#' export
+safe_sample <- function(opts, size, prob, replace) {
+
+  if(length(opts) == 1) {
+    return(rep(opts, size))
+  } else {
+    return(sample(opts, size = size, prob = prob, replace = replace))
+  }
+
+}
+
+
