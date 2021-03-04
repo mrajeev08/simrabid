@@ -109,4 +109,20 @@ safe_sample <- function(opts, size, prob = NULL, replace) {
 
 }
 
+# testing haversine distance fun
+coord_haversine_m <- function(lat, long, distance, brng, r = 6378137) {
 
+  # convert to radians
+  lat <- lat * pi / 180
+  long <- long * pi / 180
+
+  out_lat <- asin(sin(lat) * cos(distance / r) + cos(lat) * sin(distance / r) * cos(brng))
+
+  out_long <- long + atan2(sin(brng) * sin(distance / r) * cos(lat),
+                           cos(distance/ r) - sin(lat) * sin(out_lat))
+
+  out_lat <- out_lat * 180 / pi
+  out_long <- out_long * 180 / pi
+
+  return(list(x_coord = out_long, y_coord = out_lat))
+}
