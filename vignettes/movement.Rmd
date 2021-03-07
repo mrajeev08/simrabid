@@ -286,5 +286,3 @@ ggsave("vignettes/test.jpeg", out, width = 12, height = 10)
 - Compare the two methods for simulating village metapopulation model with individual based transmission (i.e. competing risks, or move_metapop (but need a different way to handle cell_ids?))
     - Distance based probability matrix from simulated movements
     - rasterized space with continuous movements
-
-# Customizing parameters (here or another vignette?)

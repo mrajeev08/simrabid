@@ -1,37 +1,40 @@
-# Parameter distributions
-# all functions should have two arguments: n & param list
-
-# secondary function (should take from param list (n & params))
-#' Title
+#' Secondary case distribution
 #'
-#' @param n
-#' @param params
-#' @param max_secondaries
+#' This function draws secondary cases from a negative binomial distribution,
+#' but constrained to a maximum (`max_secondaries`),
+#' where `R0` is the mean and `k` is the inverse of the dispersion parameter.
+#' Passed to the param `secondary_fun` in \code{\link{simrabid}}.
 #'
-#' @return
+#' @param n number to draw
+#' @param params list of parameters
+#'
+#' @return integer vector, number of secondary cases, of length `n`
 #' @export
 #'
-#' @examples
 nbinom_constrained <- function(n,
-                               params = list(R0 = 1.2, k = 1),
-                               max_secondaries = 100) {
+                               params = list(R0 = 1.2, k = 1,
+                                             max_secondaries = 100)) {
 
   secondaries <- rnbinom(n, size = 1/params$k, mu = params$R0)
+  secondaries[secondaries > params$max_secondaries] <- params$max_secondaries
 
   # return constrained!
-  return(ifelse(secondaries > max_secondaries,
-                max_secondaries, secondaries))
+  return(secondaries)
 }
 
-#' Title
+#' Dispersal kernel distribution
 #'
-#' @param n
-#' @param params
+#' This function draws dispersal distances (in meters)
+#' from a lognormal distribution, pass `param_defaults` to the parameter list
+#' for best-fit parameters from Mancy et al.
+#' Can be passed to the `dispersal_fun` in \code{\link{simrabid}} (should
+#' set parameter `sequential` to FALSE as well in that case).
 #'
-#' @return
+#' @inheritParams nbinom_constrained
+#'
+#' @return numeric vector, dispersal distances of length `n`
 #' @export
 #'
-#' @examples
 
 dispersal_lognorm <- function(n,
                               params) {
@@ -40,16 +43,18 @@ dispersal_lognorm <- function(n,
 
 }
 
-# serial interval
-#' Title
+#' Serial interval distribution
 #'
-#' @param n
-#' @param params
+#' This function draws serial intervals (in days)
+#' from a lognormal distribution, pass `param_defaults` to the parameter list
+#' for best-fit parameters from Mancy et al.
+#' Can be passed to the `serial_fun` in \code{\link{simrabid}}.
 #'
-#' @return
+#' @inheritParams nbinom_constrained
+#'
+#' @return numeric vector, serial intervals of length `n`
 #' @export
 #'
-#' @examples
 serial_lognorm <- function(n,
                            params) {
 
@@ -57,16 +62,19 @@ serial_lognorm <- function(n,
 
 }
 
-# serial interval
-#' Title
+#' Step length distribution of rabid animal movements
 #'
-#' @param n
-#' @param params
+#' This function draws step lengths (in meters)
+#' from a lognormal distribution, pass `param_defaults` to the parameter list
+#' for best-fit parameters from Mancy et al.
+#' Can be passed to the `dispersal_fun` in \code{\link{simrabid}} (should
+#' set parameter `sequential` to TRUE as well in that case).
 #'
-#' @return
+#' @inheritParams nbinom_constrained
+#'
+#' @return numeric vector of step lengths of length `n`
 #' @export
 #'
-#' @examples
 steps_weibull <- function(n,
                           params) {
 
@@ -74,53 +82,39 @@ steps_weibull <- function(n,
 
 }
 
-# generation time to the decimal timestep
-#' Title
+#' Observation function: single binomial probability
 #'
-#' @param n
-#' @param t_infected
-#' @param days_in_step
-#' @param serial_fun
+#' This function simulates the observation proccess given a
+#' single detection probability. Defaults to 0.9 when passing p
+#' `param_defaults`.
+#' Can be passed to the `observe_fun` in \code{\link{simrabid}}.
 #'
-#' @return
+#' @param I_dt the line list of cases from `simrabid`
+#' @inheritParams nbinom_constrained
+#'
+#' @return The reporting function should modify the line list
+#' in place within the simrabid function (adding a `detected` column
+#' as a boolean vector).
+#'
 #' @export
 #'
-#' @examples
-t_infectious <- function(n, t_infected, days_in_step = 7,
-                         serial_fun, params) {
-
-  t_infects <- t_infected + serial_fun(n, params)/days_in_step
-  t_infects <- ifelse(floor(t_infects) == floor(t_infected),
-                      floor(t_infected) + 1,
-                      t_infects)
-  return(t_infects)
-
-}
-
-# Reporting model
-#' Title
-#'
-#' @param I_dt
-#' @param params
-#'
-#' @return
-#' @export
-#'
-#' @examples
 binom_detect <- function(I_dt, params = list(detect_prob = 0.9)) {
   I_dt[, detected := rbinom(.N, size = 1, prob = params$detect_prob)]
 }
 
-# Reporting model with beta binomial distribution
-#' Title
+
+#' Observation function: with beta binomial distribution of detection probabilities
 #'
-#' @param I_dt
-#' @param params
+#' This function simulates the observation proccess drawing a detection
+#' probability from a beta binomial distribution for each case. Defaults are in
+#' `param_defaults`.
+#' Can be passed to the `observe_fun` in \code{\link{simrabid}}.
 #'
-#' @return
+#' @inheritParams binom_detect
+#'
+#' @inheritSection binom_detect Section return
 #' @export
 #'
-#' @examples
 beta_detect <- function(I_dt,
                               params = list(detect_alpha = 80.1,
                                             detect_beta = 8.9)) {
@@ -128,21 +122,30 @@ beta_detect <- function(I_dt,
   I_dt[, detected := rbinom(.N, size = 1, prob = probs)]
 }
 
-# Reporting model with beta binomial distribution monthly
-#' Title
+#' Observation function: with beta binomial distribution of monthly
+#' detection probabilities
 #'
-#' @param I_dt
-#' @param tmax
-#' @param params
+#' This function simulates the observation proccess drawing a detection
+#' probability from a beta binomial distribution for each month.
+#' Defaults are in `param_defaults`.
+#' Can be passed to the `observe_fun` in \code{\link{simrabid}}.
 #'
-#' @return
+#' @inheritParams binom_detect
+#'
+#' @inheritSection binom_detect Section return
 #' @export
 #'
-#' @examples
-beta_detect_monthly <- function(I_dt, tmax,
-                                      params = list(detect_alpha = 80.1,
+beta_detect_monthly <- function(I_dt, params = list(detect_alpha = 80.1,
                                                     detect_beta = 8.9)) {
-  I_dt[, month := floor(t_infectious/4)][,
+
+  # Get the number of days in step (to keep compatible with other
+  # detect functions)
+  list2env(use_mget("days_in_step", envir_num = 2), envir = environment())
+
+  # aggregate cols by timestep
+  ncols_month <- floor(30.5 / days_in_step)
+
+  I_dt[, month := floor(t_infectious/ncols_month)][,
                                          detect_prob := rbeta(1,
                                                               params$detect_alpha,
                                                               params$detect_beta),
@@ -150,19 +153,4 @@ beta_detect_monthly <- function(I_dt, tmax,
   I_dt[, detected := rbinom(.N, size = 1, prob = detect_prob)]
 }
 
-
-# Getting probability from rate
-#' Title
-#'
-#' @param rate
-#' @param step
-#'
-#' @return
-#' @export
-#'
-#' @examples
-get_prob <- function(rate, step) {
-  converted <- (1 + rate)^(1/step) - 1
-  return(1 - exp(-converted))
-}
 

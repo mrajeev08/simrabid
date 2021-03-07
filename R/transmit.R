@@ -11,7 +11,6 @@
 #'
 #' To Do:
 #' - Tests: returns should be same length as length of row_id and should be S/E/I/V/M or S/M (no NAs)
-#' - rewrite in Rcpp? Will it actually speed this up? Maybe by reducing cost of function calls
 #'
 #' @param row_id numeric vector (length >= 1) the row ids corresponding to the grid cell of the exposure (one value per exposure)
 #' @param S,E,I,V numeric vector of state variables (i.e. # of individuals in
@@ -124,7 +123,7 @@ sim_bites <- function(secondaries, ids = I_now$id,
                       weights = NULL, admin_ids = NULL,
                       sequential = TRUE, allow_invalid = TRUE,
                       leave_bounds = TRUE, max_tries = 100,
-                      params, ...) {
+                      params) {
 
   # set up
   progen_ids <- rep(ids, secondaries)
@@ -202,7 +201,6 @@ sim_bites <- function(secondaries, ids = I_now$id,
 # want to do this vectorized @ the end
 cell_to_admin <- function(cell_id, admin_ids, ncells) {
 
-  cell_id <- ifelse(cell_id %in% 1:ncells, cell_id, NA)
 
   if(all(is.na(cell_id))) {
     admin_id <- rep(NA, length(cell_id))
@@ -221,7 +219,7 @@ get_cellid <- function(x_coord, y_coord, res_m, x_topl, y_topl,
   col <- ceiling((x_coord - x_topl) / res_m)
   row <- ceiling(-(y_coord - y_topl) / res_m)
   cell_id <- row * ncols - (ncols - col)
-  cell_id <- ifelse(cell_id %in% 1:ncells, cell_id, ncells + 1) # means outside district
+  cell_id[cell_id < 1 | is.na(cell_id) | cell_id > ncells] <- ncells + 1
   return(cell_id)
 
 }

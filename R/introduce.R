@@ -8,22 +8,20 @@
 #' @param cell_ids a dummy variable passed to keep consistent with other
 #'  sim incursion function
 #' @param params consisting of two numeric vectors:
-#'  the row ids of the known incursions (`row_ids`) and
-#'  the timestep at which the known incursions should be seeded (`tsteps`)
-#' @param current_tstep the current timestep in the simulation, set to t so
-#'  that it will be called by default in the function environment
+#'  the cell ids of the known incursions (`cell_ids`) and
+#'  the timestep at which the known incursions should be seeded (`tstep`)
 #'
 #' @inheritSection sim_incursions_pois Section return
 #' @export
 #' @keywords incursions
 #'
 sim_incursions_hardwired <- function(cell_ids,
-                                     params = list(cell_ids = cell_ids_empirical,
-                                                   tsteps = tstep_empirical),
-                                     current_tstep = t, ...) {
+                                     params = list(cell_ids, tstep)) {
+
+  current_t <- get("t", envir = parent.frame(1))
 
   # filter list of empirical incursions
-  cell_id <- params$cell_ids[params$tsteps %in% current_tstep]
+  cell_id <- params$cell_ids[params$tstep %in% current_t]
 
   return(cell_id)
 }
@@ -39,7 +37,7 @@ sim_incursions_hardwired <- function(cell_ids,
 #'
 #' @param cell_ids the cells to sample incursions to
 #' @param params a list with a named parameter `iota`, the number of incursions
-#'   on average each week
+#'   on average in each time step
 #'
 #' @return numeric vector of cell_ids where incursions occured
 #'
@@ -47,8 +45,7 @@ sim_incursions_hardwired <- function(cell_ids,
 #' @keywords incursions
 #'
 sim_incursions_pois <- function(cell_ids,
-                                params = list(iota = 1),
-                                ...) {
+                                params = list(iota = 1)) {
 
   # number of incursions this week
   n_incs <- rpois(1, params$iota)
@@ -65,9 +62,12 @@ sim_incursions_pois <- function(cell_ids,
 #' \code{add_incursions} adds incursions generated from `incursion_fun` function
 #' to the line list of infections.
 #'
-#' @param incs numeric vector, number of incursions to add to each grid cell, generated
+#' @param cell_id_incs numeric vector, number of incursions to add to each grid cell, generated
 #'   from `incursion_fun`
-#' @param cell_ids integer vector, the cell_ids which correspond to the row_ids (of same length as `incs`)
+#' @param cell_ids integer vector, of all possible cell_ids to match between cell & row_ids
+#' @param ncells integer, number of grid cells total in the raster of simulated space
+#' @param admin_ids integer vector, admin ids corresponding to the row_ids
+#' @param row_ids integer vector, row id of state matrix
 #' @param x_coord numeric vector of Eastings which correspond to the centroid of grid cells
 #' @param y_coord numeric vector of Northings which correspond to the centroid of grid cells
 #' @param tstep integer, the time in which the incursions are being added (i.e. the current time step)

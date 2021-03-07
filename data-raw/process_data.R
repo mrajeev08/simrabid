@@ -11,21 +11,27 @@ library(data.table)
 library(janitor)
 library(magrittr)
 library(lubridate)
+library(here)
 select <- dplyr::select
-source("R/utils-data.R")
+
+# get latest fun
+get_latest <- function(path, pattern) {
+  list.files(path, full.names = TRUE)[grep(pattern, list.files(path))][1]
+}
+
 
 # Data -------------------------------------
 
 # shapefile
 sd_shape <-
-  st_read("data-raw/raw/SD_shape/SD_From_HHS/SD_Villages_2002_From_HHS_250m_Smoothed_UTM.shp")
+  st_read(here("data-raw/raw/SD_shape/SD_From_HHS/SD_Villages_2002_From_HHS_250m_Smoothed_UTM.shp"))
 sd_shape <- st_transform(sd_shape, crs = CRS("+init=epsg:32736"))
 
 # district wide census (@ vill level)
-sd_pops <- read_csv("data-raw/raw/SerengetiPop.csv")
-sd_census <- read_csv(get_latest("data-raw/raw/wisemonkey", "Census"))
-case_dt <- read_csv(get_latest("data-raw/raw/wisemonkey", "Animal_Contact_Tracing"))
-vacc_dt <- read_csv(get_latest("data-raw/raw/wisemonkey", "Vaccination"))
+sd_pops <- read_csv(here("data-raw/raw/SerengetiPop.csv"))
+sd_census <- read_csv(get_latest(here("data-raw/raw/wisemonkey"), "Census"))
+case_dt <- read_csv(get_latest(here("data-raw/raw/wisemonkey"), "Animal_Contact_Tracing"))
+vacc_dt <- read_csv(get_latest(here("data-raw/raw/wisemonkey"), "Vaccination"))
 
 # Get populations by village (growth & hdr) ----
 sd_pops %>%
@@ -93,9 +99,9 @@ sd_vacc_data %<>%
 usethis::use_data(sd_vacc_data, overwrite = TRUE)
 
 # Parameterization defaults (per Mancy et al. 2021) -----
-disp <- read.csv("data-raw/raw/parameters_KH/DK_params.csv")
-steps <- read.csv("data-raw/raw/parameters_KH/steps.distribution.csv")
-serial <- read.csv("data-raw/raw/parameters_KH/SI_params.csv")
+disp <- read.csv(here("data-raw/raw/parameters_KH/DK_params.csv"))
+steps <- read.csv(here("data-raw/raw/parameters_KH/steps.distribution.csv"))
+serial <- read.csv(here("data-raw/raw/parameters_KH/SI_params.csv"))
 
 param_defaults <-
   list(

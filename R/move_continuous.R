@@ -6,8 +6,8 @@
 #' This simulates movement and uses the top-left coordinates and 1-based indexing
 #' of a UTM raster to identify the grid cell moved to by an individual.
 #'
-#' @param angle numeric vector [0, 360] or value, angle at which to move at
 #' @param dist_m numeric vector or value, distance to move
+#' @param angle numeric vector [0, 360] or value, angle at which to move at
 #' @param x0 numeric vector or value, the x origin of the infected individual
 #' @param y0 numeric vector or value, the y origin of the infected individual
 #' @param x_topl numeric, the top left x coordinate of the grid on which
@@ -27,7 +27,7 @@
 #' @param leave_bounds boolean, are movements to outside of the boundaries of the are being simulated are valid
 #' @param allow_invalid boolean, are movements to empty patches (i.e. with no dogs or bodies of water, etc.) valid
 #' @param sequential boolean, if TRUE then movements are sequential, if FALSE, then
-#'   movements are kernel based; for movement_fun, the outputwill be a list if sequential and a data.table if not sequential
+#'   movements are kernel based
 #'
 #' @return a list (if sequential) or a data.table (if kernel based) with the resulting x and y coordinates, cell ids, whether
 #'   the movement was to a invalid cell, whether the movement fell within the bounds
@@ -39,7 +39,7 @@ sim_movement_continuous <-
   function(dist_m, angle, dispersal_fun, x0, y0, x_topl,
            y_topl, res_m, ncols, nrows, ncells, cells_block, cells_out_bounds, path,
            leave_bounds, allow_invalid, max_tries, sequential, weights = NULL,
-           params, ...) {
+           params) {
 
     if(sequential) {
 

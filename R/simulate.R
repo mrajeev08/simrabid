@@ -1,4 +1,63 @@
 
+#' Simulate a spatially-explicit, individual-based model of canine rabies
+#'
+#' This function simulates the rabies IBM at the specified scale. Inputs much
+#' match between the \code{\link{setup_sim}} and \code{\link{setup_space}} functions
+#' in terms of the space and timesteps being simulated.
+#'
+#' @param start_up objects for start up generated \code{\link{setup_sim}}
+#' @param start_vacc numeric vector [0, 1], starting proportion vaccinated
+#'  either length 1 or length of cells being tracked
+#' @param I_seeds integer, initial number of infections to seed randomly
+#' @param vacc_dt data.table with three columns: vacc_times (the timestep of vaccination,
+#'  should correspond to the same timesteps as being simulated),
+#'  vacc_ests (either coverage or number vaccinated), and
+#'  vacc_locs (the location id corresponding to the shapefile)
+#' @param params parameter list, should include all parameters for simulation
+#'  functions (i.e. serial_, dispersal_, secondary_, incursion_, etc.)
+#' @param days_in_step integer, the number of days in each time step being
+#'  simulated (i.e. 7 for weekly, 1 for daily)
+#' @param observe_fun function for simulating observation/detection, should take
+#'  two parameters: I_dt (the line list of cases generated in simrabid) and
+#'  params (the list of params that will be passed through the `param`)
+#' @param serial_fun function for drawing the serial interval between cases
+#' @param dispersal_fun function for drawing the dispersal distance/step length
+#' @param secondary_fun function for generating secondary cases
+#' @param incursion_fun function for seeding incursions
+#' @param movement_fun function for simulating movement, current options are
+#'  \code{\link{sim_movement_continuous}} and \code{\link{sim_movement_prob}}
+#' @param sequential boolean, whether movements should be sequential or
+#'  drawn as a kernel
+#' @param allow_invalid boolean, whether movements to invalid locations (i.e.
+#'  unpopulated areas) should be kept or movements should be resampled
+#' @param leave_bounds boolean, whether movements to locations outside the bounds
+#'  of the area being simulated should be kept or those movements should be
+#'  resampled
+#' @param max_tries the maximum number of times to resample invalid movements
+#'  if either or both `allow_invalid` and `leave_bounds` is false.
+#' @param summary_fun function for summarizing simulation, should take two
+#'  parameters a character vector of object names from the simrabid environment
+#'  that you need for use in the function.
+#' @param track boolean, whether to track failed transmission events in the line
+#'  list of cases (I_dt), i.e. invalid movements, contacts with V/E/I individuals
+#' @param weights numeric vector of the length of the number of cells (both tracked
+#'  and untracked) in the raster being simulated (for use with
+#'  \code{\link{sim_movement_prob}}
+#' @param row_probs numeric vector of the length of the number of tracked cells
+#'  for allocating vaccinations by (i.e. if you except vaccinations to be more
+#'  likely in certain grid cells vs. others)
+#' @param coverage boolean, are the vaccination estimates number of
+#'  individuals (FALSE) or the proportion vaccinated (TRUE)
+#' @param break_threshold numeric [0, 1], whether to cut-off the simulation
+#'  if population declines to below this threshold (to stop run-away simulations)
+#' @param by_admin boolean, whether simulation is being aggregated to the grid cell
+#'  or administrative (or arbitrary unit) based on the shapefile
+#' @param extra_pars list, additional parameters that you might need for the summary
+#'  or any other custom functions
+#'
+#' @return output from function passed to `summary_fun`
+#' @export
+#'
 simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                      params = c(list(R0 = 1.2, k = 1, iota = 4),
                                 param_defaults),
@@ -11,13 +70,14 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                      movement_fun = sim_movement_continuous,
                      sequential = TRUE, allow_invalid = TRUE,
                      leave_bounds = TRUE, max_tries = 100,
-                     summary_funs = list(return_env = return_env),
+                     summary_fun = return_env,
                      track = TRUE,
                      weights = NULL,
                      row_probs = NULL,
                      coverage = FALSE,
                      break_threshold = 0.8,
-                     by_admin = FALSE) {
+                     by_admin = FALSE,
+                     extra_pars = NULL) {
 
   # pass the start_up objects into the function environment
   list2env(start_up, envir = environment())
@@ -192,7 +252,7 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
   observe_fun(I_dt, params)
 
   # Summary functions which returns list of outputs
-  out <- lapply(summary_funs, function(x) x())
+  out <- summary_fun()
 
   return(out)
 

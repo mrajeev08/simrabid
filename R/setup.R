@@ -54,25 +54,36 @@ setup_space <- function(shapefile, resolution = 1000,
 #' to \code{\link{simrabid}}.
 #'
 #' @param tmax integer, the maximum number of time steps to run the simulation for
-#' @param start_pop integer vector, the population size in each cell of `rast`
-#' @param rast raster, from `setup_space` the output raster with each cell allocated
+#' @param rast raster, from \code{\link{setup_space}} the output raster with each cell allocated
 #'   to a location
+#' @param death_rate_annual annual death rate, either length 1 or length of the admin units
+#' @param birth_rate_annual annual birth rate, either length 1 or length of the admin units
+#' @param waning_rate_annual annual waning rate of vaccination immunity,
+#'  either length 1 or length of the admin units
+#' @param block_fun a function that designates the indices to track/block/consider
+#'  out-of-bounds (see \code{\link{block_cells}} for an example)
+#' @param params additional params to pass, must include start_pop, a numeric
+#'  vector of the starting population in each grid cell of `rast`
+#' @param step the number of steps to translate rate to probabilities
+#'  (i.e. 52 = weekly, 365 = daily)
 #' @param by_admin logical, should mixing be at the admin (or arbitrary) scale?
 #'
 #' @return a list of objects needed for the simulation
 #' @export
 #' @import data.table
 #' @keywords setup
-#' Need to do this differently if by admin ids
-setup_sim <- function(tmax, start_pop, rast,
+#'
+setup_sim <- function(tmax, rast,
                       death_rate_annual,
                       birth_rate_annual,
                       waning_rate_annual,
+                      block_fun = block_cells,
+                      params = list(start_pop),
                       step = 52,
                       by_admin = FALSE) {
 
   # cells to block / not track
-  all_inds <- block_cells(rast, start_pop)
+  all_inds <- block_fun(rast, params)
 
   # only tracking populated cells within district (no new pops in new cells)
   cell_ids <- all_inds$track_inds
@@ -81,7 +92,7 @@ setup_sim <- function(tmax, start_pop, rast,
   if(by_admin) {
 
     # need to group by id and spit back out
-    pop_dt <- data.table(admin_id = rast[], start_pop = start_pop)
+    pop_dt <- data.table(admin_id = rast[], start_pop = params$start_pop)
     start_pop <- pop_dt[!is.na(admin_id)][, .(pop = sum(start_pop, na.rm = TRUE)),
                                           by = "admin_id"]$pop
     bins <- max(rast[], na.rm = TRUE)
@@ -174,6 +185,7 @@ init <- function(start_pop, start_vacc, I_seeds, I_dt, cell_ids,
                              x_coord, y_coord, tstep = 1,
                              counter = 0,
                              days_in_step = 7)
+
     I_dt[I_init$id] <- I_init # this should get updated in global environment
     I <- tabulate(I_dt$row_id, nbins = bins)
   } else {
@@ -202,18 +214,31 @@ double_I <- function(I_dt) {
   return(I_dt)
 }
 
-# block cells function
-# option to write your own function that decides which cells
-# you want to block movements to
-block_cells <- function(rast, start_pop) {
+#
+#' Which cells should be considered invalid if movement occurs?
+#'
+#' This is an example function for desginating certain cells invalid/outofbounds.
+#' Can customize this to account for landscape features (i.e. lakes, rivers, mountains)
+#' where movement is not possible. Function must have two arguments: the
+#' raster input and other params passed as a list. Function must output the
+#' indexes to block, the indexes considered out of bounds, and the indices to track.
+#'
+#' @param rast raster generated using `setup_space` function
+#' @param params a list of params, in this case,
+#'  integer vector of the population size in each cell of `rast`
+#'
+#' @return indexes to block, indexes considered out of bounds, and indexes to track
+#' @export
+#'
+block_cells <- function(rast, params = list(start_pop)) {
 
   in_inds <- which(!is.na(rast[]))
   out_inds <- which(is.na(rast[]))
-  no_pop <- which(start_pop < 1 | is.na(start_pop))
+  no_pop <- which(params$start_pop < 1 | is.na(params$start_pop))
   block_inds <- no_pop[no_pop %in% in_inds]
 
   # Ones to track: inside district & unblocked
-  track_inds <- which(!is.na(rast[] & start_pop > 0))
+  track_inds <- which(!is.na(rast[] & params$start_pop > 0))
 
   return(list(block_inds = block_inds, out_inds = out_inds,
               track_inds = track_inds))

@@ -1,7 +1,7 @@
 #' Simulate movement probabilistically
 #'
 #' @inheritParams sim_bites
-#' @param ...
+#' @param angle NULL, dummy to match sim_movement_continuous
 #'
 #' @return a list (if sequential) or a data.table (if kernel based) with the resulting x and y coordinates, cell ids, whether
 #'   the movement was to a invalid cell, whether the movement fell within the bounds
@@ -13,7 +13,7 @@ sim_movement_prob <-
   function(dist_m, angle = NULL, dispersal_fun, x0, y0, x_topl,
            y_topl, res_m, ncols, nrows, ncells, cells_block, cells_out_bounds, path,
            leave_bounds, allow_invalid, max_tries, sequential, weights = NULL,
-           params, ...) {
+           params) {
 
     if(sequential) {
 
