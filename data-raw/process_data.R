@@ -5,33 +5,21 @@
 library(readr)
 library(dplyr)
 library(sf)
-library(raster)
-library(fasterize)
-library(data.table)
 library(janitor)
-library(magrittr)
-library(lubridate)
 library(here)
-select <- dplyr::select
 
 # get latest fun
 get_latest <- function(path, pattern) {
   list.files(path, full.names = TRUE)[grep(pattern, list.files(path))][1]
 }
 
-
 # Data -------------------------------------
-
 # shapefile
 sd_shape <-
-  st_read(here("data-raw/raw/SD_shape/SD_From_HHS/SD_Villages_2002_From_HHS_250m_Smoothed_UTM.shp"))
+  st_read(here("data-raw/SD_shape/SD_From_HHS/SD_Villages_2002_From_HHS_250m_Smoothed_UTM.shp"))
 sd_shape <- st_transform(sd_shape, crs = CRS("+init=epsg:32736"))
-
 # district wide census (@ vill level)
-sd_pops <- read_csv(here("data-raw/raw/SerengetiPop.csv"))
-sd_census <- read_csv(get_latest(here("data-raw/raw/wisemonkey"), "Census"))
-case_dt <- read_csv(get_latest(here("data-raw/raw/wisemonkey"), "Animal_Contact_Tracing"))
-vacc_dt <- read_csv(get_latest(here("data-raw/raw/wisemonkey"), "Vaccination"))
+sd_pops <- read_csv(here("data-raw/SerengetiPop.csv"))
 
 # Get populations by village (growth & hdr) ----
 sd_pops %>%
@@ -47,61 +35,10 @@ sd_pops %>%
 
 usethis::use_data(sd_shapefile, overwrite = TRUE)
 
-# Clean census data and out neccessary bits -----
-sd_census %>%
-  clean_names() %>%
-  select(village_2002, utm_easting, utm_northing,
-         adults, children, adult_dogs = dogs_3_months,
-         adult_dogs_vacc = vaccinated_dogs_3_months,
-         pups = pups_3_months, pups_vacc = vaccinated_pups_3_months,
-         date = actvitity_date) %>%
-  filter(!is.na(utm_easting), !is.na(utm_northing)) -> sd_census_data
-
-usethis::use_data(sd_census_data, overwrite = TRUE)
-
-# Case data ----
-case_dt %>%
-  clean_names() %>%
-  select(village_2002, utm_easting, utm_northing, biter_id, species, suspect,
-         symptoms_started_known, symptoms_started,
-         symptoms_started_accuracy)  %>%
-  filter(suspect %in% "Yes", symptoms_started_known,
-         species %in% "Domestic dog") -> sd_case_data
-
-usethis::use_data(sd_case_data, overwrite = TRUE)
-
-# Vacc data ----
-vacc_dt %>%
-  clean_names() %>%
-  select(village_2002, start_date, end_date,
-         doses, dogs_vaccinated) %>%
-  # when dogs_vaccinated not specified assume 95% of doses go to dogs
-  mutate(dogs_vaccinated = coalesce(dogs_vaccinated,
-                                         round(doses * 0.95))) -> sd_vacc_data
-
-correct_names <- tribble(~village_2002, ~corrected,
-                          "Mbirikili", "Bonchugu",
-                          "Kebanchabancha" , "Kebanchebanche",
-                          "Natta" , "Mbisso",
-                          "Natta Mbiso" , "Mbisso",
-                          "Nyamisingisi" , "Nyamasingisi")
-
-sd_vacc_data %<>%
-  left_join(correct_names) %>%
-  mutate(village_2002 = coalesce(corrected, village_2002),
-        match_2002 = sd_pops$VILLCODES[match(village_2002,
-                                              sd_pops$Village_2002)],
-        match_2012 = sd_pops$VILLCODES[match(village_2002,
-                                               sd_pops$Village_2012)],
-        villcode = coalesce(match_2002, match_2012)) %>%
-  select(-contains(c("match", "corrected")))
-
-usethis::use_data(sd_vacc_data, overwrite = TRUE)
-
 # Parameterization defaults (per Mancy et al. 2021) -----
-disp <- read.csv(here("data-raw/raw/parameters_KH/DK_params.csv"))
-steps <- read.csv(here("data-raw/raw/parameters_KH/steps.distribution.csv"))
-serial <- read.csv(here("data-raw/raw/parameters_KH/SI_params.csv"))
+disp <- read.csv(here("data-raw/parameters/DK_params.csv"))
+steps <- read.csv(here("data-raw/parameters/steps.distribution.csv"))
+serial <- read.csv(here("data-raw/parameters/SI_params.csv"))
 
 param_defaults <-
   list(
@@ -111,7 +48,6 @@ param_defaults <-
     detect_alpha = 80.1, detect_beta = 8.9,
     detect_prob = 0.9
   )
-
 
 usethis::use_data(param_defaults, overwrite = TRUE)
 

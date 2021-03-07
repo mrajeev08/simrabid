@@ -3,5 +3,5 @@
 .RData
 .Ruserdata
 inst/doc
-data-raw/SD_shape*
-data-raw/parameters*
+data-raw
+!data-raw/.*R
