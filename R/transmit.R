@@ -92,7 +92,7 @@ sim_trans <- function(row_id, S, E, I, V, bins) {
 #' @param cell_ids integer vector, the cell ids corresponding to each grid cell in which
 #'   the infectious individual is starting from
 #' @param sim_movement the movement function you want to use for simulating movement, options are sim_movement_continuous and sim_movement_prob (pass this through \code{\link{simrabid}})
-#' @inheritParams accept
+#' @inheritParams valid
 #' @inheritParams sim_movement_continuous
 #' @param weights numeric vector, weights to give each grid cell for sampling moves
 #'  for use with sim_movement_prob; will be length ncells + 1,

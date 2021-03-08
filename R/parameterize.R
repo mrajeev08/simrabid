@@ -112,7 +112,7 @@ binom_detect <- function(I_dt, params = list(detect_prob = 0.9)) {
 #'
 #' @inheritParams binom_detect
 #'
-#' @inheritSection binom_detect Section return
+#' @inherit binom_detect return
 #' @export
 #'
 beta_detect <- function(I_dt,
@@ -132,7 +132,7 @@ beta_detect <- function(I_dt,
 #'
 #' @inheritParams binom_detect
 #'
-#' @inheritSection binom_detect Section return
+#' @inherit binom_detect return
 #' @export
 #'
 beta_detect_monthly <- function(I_dt, params = list(detect_alpha = 80.1,

@@ -2,16 +2,26 @@
 % Please edit documentation in R/introduce.R
 \name{sim_incursions_pois}
 \alias{sim_incursions_pois}
-\title{Title}
+\title{Simulate incursions}
 \usage{
-sim_incursions_pois(nlocs, rows_pop, params = list(iota = 4), steps = 4)
+sim_incursions_pois(cell_ids, params = list(iota = 1))
 }
 \arguments{
-\item{steps}{}
+\item{cell_ids}{the cells to sample incursions to}
+
+\item{params}{a list with a named parameter \code{iota}, the number of incursions
+on average in each time step}
 }
 \value{
-
+numeric vector of cell_ids where incursions occured
 }
 \description{
-Title
+\code{sim_incursions_pois} simulates incursions from a poisson distribution.
 }
+\details{
+These functions are passed as an argument to the parameter \code{incursion_fun} in
+\code{\link{simrabid}} and can be customized. They must include arguments
+for \code{cell_ids} and \code{params} (if you want to change the parameter
+values or you can fix them within the function).
+}
+\keyword{incursions}

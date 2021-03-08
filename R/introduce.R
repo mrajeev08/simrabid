@@ -3,7 +3,10 @@
 #' \code{sim_incursions_hardwired} takes known incursions and seeds them explicitly
 #' in time and space.
 #'
-#' @inheritSection sim_incursions_pois Section details
+#' These functions are passed as an argument to the parameter `incursion_fun` in
+#' \code{\link{simrabid}} and can be customized. They must include arguments
+#' for `cell_ids` and `params` (if you want to change the parameter
+#' values or you can fix them within the function).
 #'
 #' @param cell_ids a dummy variable passed to keep consistent with other
 #'  sim incursion function
@@ -11,7 +14,7 @@
 #'  the cell ids of the known incursions (`cell_ids`) and
 #'  the timestep at which the known incursions should be seeded (`tstep`)
 #'
-#' @inheritSection sim_incursions_pois Section return
+#' @inherit sim_incursions_pois return
 #' @export
 #' @keywords incursions
 #'
@@ -75,7 +78,7 @@ sim_incursions_pois <- function(cell_ids,
 #' @param days_in_step integer, the number of days in each tstep, to assign the day
 #'   of infectiousness to each incursion
 #'
-#' @inheritSection sim_bites Section return
+#' @inherit sim_bites return
 #' @export
 #' @import data.table
 #' @keywords incursions internal

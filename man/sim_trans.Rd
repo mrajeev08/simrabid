@@ -4,22 +4,20 @@
 \alias{sim_trans}
 \title{Simulate transmission outcomes of exposures at individual level}
 \usage{
-sim_trans(row_id, S, E, I, V, nlocs, track = FALSE)
+sim_trans(row_id, S, E, I, V, bins)
 }
 \arguments{
 \item{row_id}{numeric vector (length >= 1) the row ids corresponding to the grid cell of the exposure (one value per exposure)}
 
 \item{S, E, I, V}{numeric vector of state variables (i.e. # of individuals in
-each class in each grid cell) of length nlocs}
+each class in each grid cell) of length bins}
 
-\item{nlocs}{numeric, number of grid cells total}
-
-\item{track}{boolean, whether to explicitly track the outcome of each exposure or
-to only track whether successful or not (i.e. with a suscpetible or no). See details.}
+\item{bins}{numeric, either the number of grid cells total OR
+the number of admin units, for when simulating at admin rather
+than grid cell level}
 }
 \value{
 a list of two vectors (contact and infected) of same length as \code{row_id}.
-contact will be NULL if track = FALSE.
 }
 \description{
 \code{sim_trans} simulates the outcome of each exposure/transmission event
@@ -35,7 +33,6 @@ in that location) or just whether with a susceptible (S) or not (M) (see \code{t
 To Do:
 \itemize{
 \item Tests: returns should be same length as length of row_id and should be S/E/I/V/M or S/M (no NAs)
-\item rewrite in Rcpp? Will it actually speed this up? Maybe by reducing cost of function calls
 }
 }
 \keyword{internal}

@@ -2,11 +2,14 @@
 % Please edit documentation in R/introduce.R
 \name{add_incursions}
 \alias{add_incursions}
-\title{Title}
+\title{Add incursions to infectious line list}
 \usage{
 add_incursions(
-  incs,
+  cell_id_incs,
   cell_ids,
+  ncells,
+  admin_ids = NULL,
+  row_ids,
   x_coord,
   y_coord,
   tstep,
@@ -15,11 +18,35 @@ add_incursions(
 )
 }
 \arguments{
-\item{days_in_step}{}
+\item{cell_id_incs}{numeric vector, number of incursions to add to each grid cell, generated
+from \code{incursion_fun}}
+
+\item{cell_ids}{integer vector, of all possible cell_ids to match between cell & row_ids}
+
+\item{ncells}{integer, number of grid cells total in the raster of simulated space}
+
+\item{admin_ids}{integer vector, admin ids corresponding to the row_ids}
+
+\item{row_ids}{integer vector, row id of state matrix}
+
+\item{x_coord}{numeric vector of Eastings which correspond to the centroid of grid cells}
+
+\item{y_coord}{numeric vector of Northings which correspond to the centroid of grid cells}
+
+\item{tstep}{integer, the time in which the incursions are being added (i.e. the current time step)}
+
+\item{counter}{integer, the id number to start from to assign ids to the new incursions}
+
+\item{days_in_step}{integer, the number of days in each tstep, to assign the day
+of infectiousness to each incursion}
 }
 \value{
-
+a data.table that corresponds to the columns in I_dt in the simulation.
+See \code{\link{simrabid}} for full description.
 }
 \description{
-Title
+\code{add_incursions} adds incursions generated from \code{incursion_fun} function
+to the line list of infections.
 }
+\keyword{incursions}
+\keyword{internal}

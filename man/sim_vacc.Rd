@@ -5,22 +5,22 @@
 \title{Simulate vaccination at individual level}
 \usage{
 sim_vacc(
-  vacc_cov,
+  vacc_est,
   vacc_locs,
   S,
   V,
   N,
   loc_ids,
-  nlocs,
+  bins,
   row_ids,
   row_probs = NULL,
   coverage = TRUE
 )
 }
 \arguments{
-\item{vacc_cov}{numeric vector of coverage estimates (either \link{0, 1} or the number vaccinated)}
+\item{vacc_est}{numeric vector of coverage estimates (either \link{0, 1} or the number vaccinated)}
 
-\item{vacc_locs}{vector of numeric or character ids of same length as \code{vacc_cov},
+\item{vacc_locs}{vector of numeric or character ids of same length as \code{vacc_est},
 the locations corresponding to the coverage estimates}
 
 \item{S, V, N, }{numeric vector of Susceptibles, Vaccinated, and the Population size
@@ -29,11 +29,13 @@ respectively, of same length}
 \item{loc_ids}{vector of numeric or character ids of same length as \strong{S/V/N} that
 matches the demographic vectors to the locations from \code{vacc_locs}}
 
-\item{nlocs}{numeric, the total number of grid cells being simulated (i.e. at the scale of the simulation,
-this can be different than the scale of the vaccination campaigns)}
+\item{bins}{numeric, the total number of grid cells being simulated (i.e. at the scale of the simulation,
+this can be different than the scale of the vaccination campaigns) OR the
+number of admin units, for when simulating at admin rather
+than grid cell level, defaults to NULL}
 
 \item{row_ids}{numeric vector of same length as \strong{S/V/N} of the row id corresponding to the demographic vectors to
-sample which grid cell vaccinations are allocated to}
+sample which grid cell or admin unit vaccinations are allocated to (if admin unit the same as loc_ids)}
 
 \item{row_probs}{numeric vector, optionally can pass the probability of vaccination
 for each grid cell, defaults to NULL.}
@@ -43,7 +45,7 @@ are translated to numbers with rbinom and then allocated, if FALSE then number
 vaccinated are allocated (constrained to the available susceptible dogs)}
 }
 \value{
-a numeric vector of length \strong{nlocs} of the number of currently vaccinated
+a numeric vector of length \strong{bins} of the number of currently vaccinated
 individuals in each grid cell
 }
 \description{
@@ -61,7 +63,7 @@ This can also be modified by passing \code{row_probs}, grid cell level probabili
 To Do:
 \itemize{
 \item Tests/ catches for lengths? This might slow things down! (maybe should be higher level test/catch)
-\item Tests: return should be same length as nlocs, should be positive integer & non NA
+\item Tests: return should be same length as bins, should be positive integer & non NA
 }
 }
 \keyword{internal}

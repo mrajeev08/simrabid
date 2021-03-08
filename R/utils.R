@@ -28,23 +28,13 @@ coord_haversine_m <- function(lat, long, distance, brng, r = 6378137) {
   return(list(x_coord = out_long, y_coord = out_lat))
 }
 
-#' getting probability from rate
+# getting probability from rate
 get_prob <- function(rate, step) {
   converted <- (1 + rate)^(1/step) - 1
   return(1 - exp(-converted))
 }
 
-#' Generation time to the decimal timestep
-#'
-#' @param n
-#' @param t_infected
-#' @param days_in_step
-#' @param serial_fun
-#' @param params
-#'
-#' @return
-#' @keywords internal
-#'
+# Generation time to the decimal timestep
 t_infectious <- function(n, t_infected, days_in_step = 7,
                          serial_fun, params) {
 

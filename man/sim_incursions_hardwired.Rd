@@ -2,22 +2,29 @@
 % Please edit documentation in R/introduce.R
 \name{sim_incursions_hardwired}
 \alias{sim_incursions_hardwired}
-\title{Title}
+\title{Seed incursions explicitly}
 \usage{
-sim_incursions_hardwired(
-  nlocs,
-  rows_pop,
-  row_ids = args$row_ids_empirical,
-  tsteps = args$tstep_empirical,
-  current_tstep = t
-)
+sim_incursions_hardwired(cell_ids, params = list(cell_ids, tstep))
 }
 \arguments{
-\item{current_tstep}{}
+\item{cell_ids}{a dummy variable passed to keep consistent with other
+sim incursion function}
+
+\item{params}{consisting of two numeric vectors:
+the cell ids of the known incursions (\code{cell_ids}) and
+the timestep at which the known incursions should be seeded (\code{tstep})}
 }
 \value{
-
+numeric vector of cell_ids where incursions occured
 }
 \description{
-Title
+\code{sim_incursions_hardwired} takes known incursions and seeds them explicitly
+in time and space.
 }
+\details{
+These functions are passed as an argument to the parameter \code{incursion_fun} in
+\code{\link{simrabid}} and can be customized. They must include arguments
+for \code{cell_ids} and \code{params} (if you want to change the parameter
+values or you can fix them within the function).
+}
+\keyword{incursions}

@@ -35,7 +35,7 @@ a given location}
 }
 \value{
 a data.table with three columns: vacc_times (timestep of campaign),
-vacc_cov (coverage estimate), vacc_locs (location of campaign)
+vacc_est (coverage/number vaccinated estimate), vacc_locs (location of campaign)
 }
 \description{
 \code{sim_campaigns} simulates annual vaccination campaigns across locations & time.
@@ -58,7 +58,7 @@ To Do:
 \item And if locs & probs don't match in length
 \item And if functions passed don't have n as an argument (can they use function env vars though?)
 \item Tests: return should be a data.table with three columns; timestep should be in realm of possible &
-burn in period should be zero. vacc_cov should be between \link{0, 1}, vacc_locs should be all from locs only; no NAs
+burn in period should be zero. vacc_est should be between \link{0, 1}, vacc_locs should be all from locs only; no NAs
 }
 }
 \examples{

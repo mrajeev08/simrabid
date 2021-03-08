@@ -103,12 +103,6 @@ sim_movement_prob <-
 #'
 #' @export
 #'
-#' @example
-#' covars <- list(pop = rpois(100, 100), proximity_to_road = runif(100, 0, 10), intercept = 1)
-#' params <- list(pop = 1.2, proximity_to_road = -0.5, intercept = -5)
-#' weights <- cell_weights(covars = covars, params = params, ncells = 100,
-#'                         leave_bounds = TRUE, allow_invalid = FALSE,
-#'                         cells_block = c(1, 35, 20), cells_out_bounds = 90:100)
 cell_weights <- function(covars = list(0),
                          params = list(0),
                          ncells,
@@ -151,7 +145,7 @@ cell_weights <- function(covars = list(0),
 #' Subset weights of cells to the candidate cell ids
 #'
 #' @inheritParams sim_bites
-#' Weights should be length ncells + 1
+#'
 #' @return a vector of weights corresponding to the cell_ids passed through
 #' @keywords move internal
 #'

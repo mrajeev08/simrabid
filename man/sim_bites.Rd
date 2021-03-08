@@ -11,19 +11,25 @@ sim_bites(
   y_coords = I_now$y_coord,
   t_infectious = I_now$t_infectious,
   counter = max(I_dt$id),
+  sim_movement = sim_movement_continuous,
   dispersal_fun,
   res_m,
   row_ids,
   cell_ids,
-  cells_pop,
-  nrow,
-  ncol,
+  cells_block,
+  cells_out_bounds,
+  nrows,
+  ncols,
+  ncells,
   x_topl,
   y_topl,
+  weights = NULL,
+  admin_ids = NULL,
   sequential = TRUE,
-  allow_empties = TRUE,
+  allow_invalid = TRUE,
   leave_bounds = TRUE,
-  max_tries = 100
+  max_tries = 100,
+  params
 )
 }
 \arguments{
@@ -40,8 +46,10 @@ individual became infectious}
 
 \item{counter}{integer, the id number to start with for resulting secondary cases}
 
+\item{sim_movement}{the movement function you want to use for simulating movement, options are sim_movement_continuous and sim_movement_prob (pass this through \code{\link{simrabid}})}
+
 \item{dispersal_fun}{function with a single parameter, n, which will draw distances
-for each individual to move}
+for each individual to move in meters}
 
 \item{res_m}{numeric, the grid cell resolution in meters}
 
@@ -51,12 +59,16 @@ the infectious individual is starting from}
 \item{cell_ids}{integer vector, the cell ids corresponding to each grid cell in which
 the infectious individual is starting from}
 
-\item{cells_pop}{integer vector, the cell ids of grid cells that are populated
-or generally where movements are valid to}
+\item{cells_block}{integer vector, the cell ids of grid cells where movements are invalid to,
+for use with max_tries
+@param cells_out_bounds integer vector, the cell ids of grid cells which are outside the bounds/
+not covered by the area being simulated}
 
-\item{nrow}{numeric, the number of rows in the grid}
+\item{nrows}{numeric, the number of rows in the grid}
 
-\item{ncol}{numeric, the number of columns in the grid}
+\item{ncols}{numeric, the number of columns in the grid}
+
+\item{ncells}{numeric, the number of total cells (ncol * nrow)}
 
 \item{x_topl}{numeric, the top left x coordinate of the grid on which
 movement is being simulated}
@@ -64,18 +76,25 @@ movement is being simulated}
 \item{y_topl}{numeric, the top left y coordinate of the grid on which
 movement is being simulated}
 
+\item{weights}{numeric vector, weights to give each grid cell for sampling moves
+for use with sim_movement_prob; will be length ncells + 1,
+see \code{\link{cell_weights}}) for more details.
+defaults to NULL}
+
+\item{admin_ids}{if aggregating by the administrative unit (rather than grid cell), pass the rasterized
+administrative ids for each cell}
+
 \item{sequential}{boolean, if TRUE then movements are sequential, if FALSE, then
-movements are kernel based (see Details)}
+movements are kernel based}
 
-\item{allow_empties}{boolean, are movements to empty patches (i.e. with no dogs) valid}
+\item{allow_invalid}{boolean, are movements to empty patches (i.e. with no dogs or bodies of water, etc.) valid}
 
-\item{leave_bounds}{boolean, are movements to outside of the boundaries of the are being
-simulated valid}
+\item{leave_bounds}{boolean, are movements to outside of the boundaries of the are being simulated are valid}
 
 \item{max_tries}{integer, the maximum number of tries to make before accepting
 an invalid movement (i.e. transmission event fails due to either leaving the
 bounds of the simulation or moving to an uninhabitable grid cell) if either
-or both leave_bounds and allow_empties are FALSE.}
+or both leave_bounds and allow_invalid are FALSE.}
 }
 \value{
 a data.table that corresponds to the columns in I_dt in the simulation.
@@ -93,8 +112,15 @@ first location of exposure, then from this to the second, etc.)
 or can be kernel based where movements are all seeded from
 the origin location of the infected individual. Movements outside of the bounds
 of the simulation or to uninhabitable grid cells can either be accepted (if
-\code{leave_bounds} or \code{allow_empties} are \code{TRUE}). If \code{FALSE}, these movements will not be
+\code{leave_bounds} or \code{allow_invalid} are \code{TRUE}). If \code{FALSE}, these movements will not be
 accepted and will be redrawn \code{max_tries} times.
+
+To Do:
+\itemize{
+\item Tests: returns should have same column structure & order as the I_dt template
+and rows should = sum of secondaries
+\item rewrite in Rcpp? Will it actually speed this up? Maybe by reducing cost of function calls
+}
 }
 \keyword{internal}
-\keyword{transmit}
+\keyword{move}
