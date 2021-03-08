@@ -28,11 +28,13 @@
 #'  \code{\link{sim_movement_continuous}} and \code{\link{sim_movement_prob}}
 #' @param sequential boolean, whether movements should be sequential or
 #'  drawn as a kernel
-#' @param allow_invalid boolean, whether movements to invalid locations (i.e.
-#'  unpopulated areas) should be kept or movements should be resampled
+#' @param allow_invalid boolean, whether movements to invalid locations
+#'  should be kept or movements should be resampled (i.e. then transmission
+#'  events can fail due to movement into an unihabited patch
 #' @param leave_bounds boolean, whether movements to locations outside the bounds
 #'  of the area being simulated should be kept or those movements should be
-#'  resampled
+#'  resampled (i.e. transmission events can fail due to movement outside of
+#'  the district
 #' @param max_tries the maximum number of times to resample invalid movements
 #'  if either or both `allow_invalid` and `leave_bounds` is false.
 #' @param summary_fun function for summarizing simulation, should take two
