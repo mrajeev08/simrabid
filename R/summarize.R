@@ -46,7 +46,7 @@ return_env <- function() {
 #'  population size, and coverage.
 #'
 #' @keywords summarize
-#'
+#' @export
 check_sim <- function(names = c("I_dt", "S_mat", "N_mat", "tmax", "days_in_step")) {
 
   # Get the objects you need from the environment above this one
