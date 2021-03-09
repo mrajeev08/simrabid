@@ -173,7 +173,7 @@ sim_vacc <- function(vacc_est, vacc_locs, S, V, N, loc_ids, bins,
 
     # sample locations by the number of available susceptibles
     # and optionally weight that sampling by the probability of vacc in that cell
-    vacc_ids <- sus_dt[, .(row_id = safe_sample(opts = rep(row_ids, S),
+    vacc_ids <- sus_dt[, .(row_id = safe_sample(x = rep(row_ids, S),
                                                 size = nvacc[1],
                                                 replace = FALSE,
                                                 prob = rep(row_probs, S))),

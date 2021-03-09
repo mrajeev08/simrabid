@@ -178,7 +178,7 @@ init <- function(start_pop, start_vacc, I_seeds, I_dt, cell_ids,
   # Seed cases at t0 and create data.table
 
   if(I_seeds > 0) {
-    cell_id_incs <- safe_sample(opts = cell_ids, size = I_seeds, replace = TRUE)
+    cell_id_incs <- safe_sample(x = cell_ids, size = I_seeds, replace = TRUE)
 
     I_init <- add_incursions(cell_id_incs, cell_ids, ncells,
                              admin_ids, row_ids,

@@ -54,7 +54,7 @@ sim_incursions_pois <- function(cell_ids,
   n_incs <- rpois(1, params$iota)
 
   # sample cell ids by bins
-  cell_id <- safe_sample(opts = cell_ids, size = n_incs, replace = TRUE)
+  cell_id <- safe_sample(x = cell_ids, size = n_incs, replace = TRUE)
 
   return(cell_id)
 }

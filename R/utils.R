@@ -1,17 +1,15 @@
 #' Safer implementation of base sample
 #'
 #' Wraps sample function in base R so that if options are length 1 and an integer,
-#' doesn't default to sample.int. See \code{\link{sample}} for arguments. Only
-#' with replace = TRUE (as the function will return the option of length 1 with
-#' length of size).
+#' doesn't default to sample.int. See \code{\link{sample}} for arguments.
 #'
 #' @export
-safe_sample <- function(x, size, prob = NULL) {
+safe_sample <- function(x, size, prob = NULL, replace = TRUE) {
 
   if(length(x) == 1) {
     return(rep(x, size))
   } else {
-    return(sample(x, size = size, prob = prob, replace = TRUE))
+    return(sample(x, size = size, prob = prob, replace = replace))
   }
 
 }
