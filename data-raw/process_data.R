@@ -33,7 +33,7 @@ sd_pops %>%
   left_join(clean_names(sd_shape), .,
             by = c("vill_2002" = "village_2002")) -> sd_shapefile
 
-usethis::use_data(sd_shapefile, overwrite = TRUE)
+st_write(sd_shapefile, "inst/extdata/sd_shapefile.shp", append = FALSE)
 
 # Parameterization defaults (per Mancy et al. 2021) -----
 disp <- read.csv(here("data-raw/parameters/DK_params.csv"))

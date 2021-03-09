@@ -99,7 +99,7 @@ setup_sim <- function(tmax, rast,
     loc_ids <- 1:bins
 
   } else {
-    start_pop <- start_pop[cell_ids]
+    start_pop <- params$start_pop[cell_ids]
     bins <- length(cell_ids)
     loc_ids <- rast[cell_ids]
 
