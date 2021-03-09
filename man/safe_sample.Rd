@@ -4,11 +4,9 @@
 \alias{safe_sample}
 \title{Safer implementation of base sample}
 \usage{
-safe_sample(x, size, prob = NULL)
+safe_sample(x, size, prob = NULL, replace = TRUE)
 }
 \description{
 Wraps sample function in base R so that if options are length 1 and an integer,
-doesn't default to sample.int. See \code{\link{sample}} for arguments. Only
-with replace = TRUE (as the function will return the option of length 1 with
-length of size).
+doesn't default to sample.int. See \code{\link{sample}} for arguments.
 }
