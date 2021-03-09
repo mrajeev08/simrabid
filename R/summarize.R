@@ -77,12 +77,12 @@ check_sim <- function(names = c("I_dt", "S_mat", "N_mat", "tmax", "days_in_step"
   max_dist_m <- max(dist_linked(I_dt))
 
   # times
-  mean_times_days <- mean(times_linked(I_dt))
-  max_times_days <- mean(times_linked(I_dt))
+  mean_times <- mean(times_linked(I_dt))
+  max_times <- max(times_linked(I_dt))
 
   # data.table with tstep as additional covariate
   data.table(month = 1:length(I_total), I_local, I_total, I_detected,
-             S, N, cov, mean_dist_m, max_dist_m, mean_times_days, max_times_days)
+             S, N, cov, mean_dist_m, max_dist_m, mean_times, max_times)
 }
 
 # summarize every 4 columns
