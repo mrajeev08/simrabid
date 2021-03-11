@@ -8,16 +8,12 @@ library(sf)
 library(janitor)
 library(here)
 
-# get latest fun
-get_latest <- function(path, pattern) {
-  list.files(path, full.names = TRUE)[grep(pattern, list.files(path))][1]
-}
-
 # Data -------------------------------------
 # shapefile
 sd_shape <-
   st_read(here("data-raw/SD_shape/SD_From_HHS/SD_Villages_2002_From_HHS_250m_Smoothed_UTM.shp"))
-sd_shape <- st_transform(sd_shape, crs = CRS("+init=epsg:32736"))
+sd_shape <- st_transform(sd_shape, sf::st_crs(32736))
+
 # district wide census (@ vill level)
 sd_pops <- read_csv(here("data-raw/SerengetiPop.csv"))
 
