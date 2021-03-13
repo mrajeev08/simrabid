@@ -2,7 +2,8 @@
 #'
 #' This function draws secondary cases from a negative binomial distribution,
 #' but constrained to a maximum (`max_secondaries`),
-#' where `R0` is the mean and `k` is the inverse of the dispersion parameter.
+#' where `R0` is the mean (mu in rnbinom) and `k` is the dispersion parameter
+#' (size in rnbinom).
 #' Passed to the param `secondary_fun` in \code{\link{simrabid}}.
 #'
 #' @param n number to draw
@@ -15,7 +16,7 @@ nbinom_constrained <- function(n,
                                params = list(R0 = 1.2, k = 1,
                                              max_secondaries = 100)) {
 
-  secondaries <- rnbinom(n, size = 1/params$k, mu = params$R0)
+  secondaries <- rnbinom(n, size = params$k, mu = params$R0)
   secondaries[secondaries > params$max_secondaries] <- params$max_secondaries
 
   # return constrained!
