@@ -120,7 +120,7 @@ setup_sim <- function(start_date = "2002-01-01",
 
   # get timesteps & tmax using approximate dates
   step <- 365.25 / days_in_step
-  tmax <- ceiling(as.numeric(lubridate::ymd(start_date) - lubridate::ymd(apprx_end_date)) / days_in_step)
+  tmax <- ceiling(as.numeric(lubridate::ymd(apprx_end_date) - lubridate::ymd(start_date)) / days_in_step)
 
   # actual end date (to ensure same number of days in each timestep)
   end_date <- lubridate::ymd(start_date) + tmax * days_in_step
