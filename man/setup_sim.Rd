@@ -5,19 +5,27 @@
 \title{Set-up simulation}
 \usage{
 setup_sim(
-  tmax,
+  start_date = "2002-01-01",
+  apprx_end_date = "2020-01-01",
+  days_in_step = 7,
   rast,
   death_rate_annual,
   birth_rate_annual,
   waning_rate_annual,
   block_fun = block_cells,
   params = list(start_pop),
-  step = 52,
   by_admin = FALSE
 )
 }
 \arguments{
-\item{tmax}{integer, the maximum number of time steps to run the simulation for}
+\item{start_date}{date, the starting date for the simulation in year-month-day format}
+
+\item{apprx_end_date}{date, the approximate end date for the simulation in year-month-day format,
+the set-up fun will return the actual end date of the simulation rounded up to the
+maximum number of timesteps in the interval based on \code{days_in_step}}
+
+\item{days_in_step}{the number of days to aggregate timesteps by, defaults to 7 ("weekly"),
+but can be arbitrary number of days}
 
 \item{rast}{raster, from \code{\link{setup_space}} the output raster with each cell allocated
 to a location}
@@ -34,9 +42,6 @@ out-of-bounds (see \code{\link{block_cells}} for an example)}
 
 \item{params}{additional params to pass, must include start_pop, a numeric
 vector of the starting population in each grid cell of \code{rast}}
-
-\item{step}{the number of steps to translate rate to probabilities
-(i.e. 52 = weekly, 365 = daily)}
 
 \item{by_admin}{logical, should mixing be at the admin (or arbitrary) scale?}
 }

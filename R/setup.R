@@ -53,7 +53,12 @@ setup_space <- function(shapefile, resolution = 1000,
 #' \code{setup_sim} takes inputs and generates all needed outputs to be passed
 #' to \code{\link{simrabid}}.
 #'
-#' @param tmax integer, the maximum number of time steps to run the simulation for
+#' @param start_date date, the starting date for the simulation in year-month-day format
+#' @param apprx_end_date date, the approximate end date for the simulation in year-month-day format,
+#'  the set-up fun will return the actual end date of the simulation rounded up to the
+#'  maximum number of timesteps in the interval based on `days_in_step`
+#' @param days_in_step the number of days to aggregate timesteps by, defaults to 7 ("weekly"),
+#'  but can be arbitrary number of days
 #' @param rast raster, from \code{\link{setup_space}} the output raster with each cell allocated
 #'   to a location
 #' @param death_rate_annual annual death rate, either length 1 or length of the admin units
@@ -64,8 +69,7 @@ setup_space <- function(shapefile, resolution = 1000,
 #'  out-of-bounds (see \code{\link{block_cells}} for an example)
 #' @param params additional params to pass, must include start_pop, a numeric
 #'  vector of the starting population in each grid cell of `rast`
-#' @param step the number of steps to translate rate to probabilities
-#'  (i.e. 52 = weekly, 365 = daily)
+
 #' @param by_admin logical, should mixing be at the admin (or arbitrary) scale?
 #'
 #' @return a list of objects needed for the simulation
@@ -73,13 +77,15 @@ setup_space <- function(shapefile, resolution = 1000,
 #' @import data.table
 #' @keywords setup
 #'
-setup_sim <- function(tmax, rast,
+setup_sim <- function(start_date = "2002-01-01",
+                      apprx_end_date = "2020-01-01",
+                      days_in_step = 7,
+                      rast,
                       death_rate_annual,
                       birth_rate_annual,
                       waning_rate_annual,
                       block_fun = block_cells,
                       params = list(start_pop),
-                      step = 52,
                       by_admin = FALSE) {
 
   # cells to block / not track
@@ -112,6 +118,13 @@ setup_sim <- function(tmax, rast,
     birth_rate_annual <- birth_rate_annual[rast[cell_ids]]
   }
 
+  # get timesteps & tmax using approximate dates
+  step <- 365.25 / days_in_step
+  tmax <- ceiling(as.numeric(lubridate::ymd(start_date) - lubridate::ymd(apprx_end_date)) / days_in_step)
+
+  # actual end date (to ensure same number of days in each timestep)
+  end_date <- lubridate::ymd(start_date) + tmax * days_in_step
+
   # other dem params
   death_prob <- get_prob(rate = death_rate_annual, step = step) # annual death rate to prob
   birth_prob <- get_prob(rate = birth_rate_annual, step = step) # annual birth rate to prob
@@ -137,7 +150,8 @@ setup_sim <- function(tmax, rast,
               V_mat = V_mat, N_mat = N_mat, cell_ids = cell_ids,
               cells_block = all_inds$block_inds,
               cells_out_bounds = all_inds$out_inds,
-              I_dt = I_dt, empty_dt = empty_dt,
+              I_dt = I_dt,
+              empty_dt = empty_dt,
               loc_ids = loc_ids,
               start_pop = start_pop,
               nrows = nrow(rast),
@@ -149,8 +163,12 @@ setup_sim <- function(tmax, rast,
               y_coord = coords[, 2],
               admin_ids = rast[], # admin unit ids to aggregate to
               bins = bins,
-              res_m = res(rast)[1], tmax = tmax,
-              death_prob = death_prob, birth_prob = birth_prob,
+              res_m = res(rast)[1],
+              tmax = tmax,
+              start_date = start_date,
+              end_date = end_date,
+              death_prob = death_prob,
+              birth_prob = birth_prob,
               waning_prob = waning_prob))
 }
 

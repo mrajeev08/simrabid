@@ -86,6 +86,7 @@ check_sim <- function(names = c("I_dt", "S_mat", "N_mat", "tmax", "days_in_step"
 }
 
 # summarize every 4 columns
+# TO DO: change these to calendar months!
 sum_to_month <- function(ts, nc = 4) {
 
   if(!is.null(dim(ts))) {

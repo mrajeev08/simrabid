@@ -17,6 +17,7 @@ integer vector, number of secondary cases, of length \code{n}
 \description{
 This function draws secondary cases from a negative binomial distribution,
 but constrained to a maximum (\code{max_secondaries}),
-where \code{R0} is the mean and \code{k} is the inverse of the dispersion parameter.
+where \code{R0} is the mean (mu in rnbinom) and \code{k} is the dispersion parameter
+(size in rnbinom).
 Passed to the param \code{secondary_fun} in \code{\link{simrabid}}.
 }
