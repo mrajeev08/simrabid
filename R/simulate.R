@@ -48,6 +48,7 @@
 #' @param row_probs numeric vector of the length of the number of tracked cells
 #'  for allocating vaccinations by (i.e. if you except vaccinations to be more
 #'  likely in certain grid cells vs. others)
+#' @param routine_vacc proportion of new born dogs vaccinated, defaults to zero
 #' @param coverage boolean, are the vaccination estimates number of
 #'  individuals (FALSE) or the proportion vaccinated (TRUE)
 #' @param break_threshold numeric [0, 1], whether to cut-off the simulation
@@ -79,7 +80,8 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
                      coverage = FALSE,
                      break_threshold = 0.8,
                      by_admin = FALSE,
-                     extra_pars = NULL) {
+                     extra_pars = NULL,
+                     routine_vacc = 0) {
 
   # pass the start_up objects into the function environment
   list2env(start_up, envir = environment())
@@ -106,7 +108,17 @@ simrabid <- function(start_up, start_vacc, I_seeds, vacc_dt,
 
     # Susceptible class
     S <- S - rbinom(bins, size = S, prob = death_prob) + waning
-    S <- S + rbinom(bins, size = S + V, prob = birth_prob)
+    births <- rbinom(bins, size = S + V, prob = birth_prob)
+
+    if(routine_vacc > 0) {
+      rvacc <- rbinom(bins, size = births, prob = routine_vacc)
+      births <- births - rvacc
+    } else {
+      rvacc <- 0
+    }
+
+    V <- V + rvacc
+    S <- S + births
 
     # Vaccination ----
     inds <- vacc_times == t

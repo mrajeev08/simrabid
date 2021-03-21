@@ -42,7 +42,8 @@ param_defaults <-
     disp_meanlog = disp$DK_meanlog, disp_sdlog = disp$DK_sdlog,
     serial_meanlog = serial$SI_ml, serial_sdlog = serial$SI_sdlog,
     detect_alpha = 80.1, detect_beta = 8.9,
-    detect_prob = 0.9
+    detect_prob = 0.9,
+    max_secondaries = 100
   )
 
 usethis::use_data(param_defaults, overwrite = TRUE)
