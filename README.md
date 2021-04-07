@@ -11,36 +11,45 @@ development version: clone the repo and from within the directory, run `devtools
 - Just [`data.table`](https://rdatatable.gitlab.io/data.table/) so far!
 - And devtools in the short term for dev.
 
-## To Do
+## Roadmap
 
-- Add a time out (i.e. to better manage computational budgets we stop simulations that deplete > 20% of the starting population)
-- memoizing cell id functions?
+- A relative probability based movement model (i.e. movement probability is relative 
+  to index location, for instance if you want to account for landscape barriers (roads, rivers, etc.)); 
+  see old commit code for how this might work with a probability list;
+
+- Use non utm coordinate space, instead use cellFromXY in raster and haversine distances 
+ to get location of cell id movements so that you can simulate across larger 
+ spatial scales; one issue is then your scale of aggregation gets distorted, aggregate grid cells somehow
+ so it's approximately 1 km?
+
+- Implement carrying capacity on pop growth, and replacement of dogs removed due to infection.
+
+- Implement colonization of uninhabited patches (with some limits so households can't pop up in space
+  that is uninhabitable, i.e. rivers/roads/etc.)
+
+- Build a constructor class that gets passed to simrabid function so that only **valid** combinations
+  of model arguments can be passed, and you only have to test this once for N simulations. 
+
+- Profile and speed up! 
+  - Vaccination function
+  - Filtering data.table
+  - Only track currently infectious + exposed linelist
+  - Easy fixes (i.e. storing things in the appropriate type, keys onf filters, etc.)
+
+- Issue with intermediate scales where small admin units do not get matched to 
+  any grid cell
+
 - Village metapopulation (separate function?)
-- Keys for faster data.table filtering (i.e. for boolean values especially! store the 0/1 as logical!)
-- Do tests to make sure it makes sense with SD data (unit tests?!)
-- Document and build! (managing namespace & dependencies)
-- Test summary stats (for the longer ones write in Rcpp)
-- Try them out on the cluster (and ask HPC folks if it's smarter to do it as array or mpi cluster)
-- Make a branch for probability based movements (i.e. cell based movements)
-- Keep both options (continuous space vs. discretized -- does it amount to
-the same @ fine scales)(vignette)
-- Separate branch for Rcpp functions for movement (continuous time & cell based), transmission;
-- Last optimization should be moving to indexed vector world (rather than lists) (accumulators should get spit out at beginning and doubled when necessary)(exposed gets inserted as needed)(bind together as data.table at end)
-- Benchmark vignette for decisions on filtering and syntax within functions (worthwhile to run again and on multiple systems maybe?) (MEMORY & TIME & ACROSS OBJECT SIZES)
-- Pass everything that can be passed as vector/mat/list as such instead of data.table/frame (i.e. try vacc_dt as vector filter & use matching on loc_id to join)--vector of location ids, steps, and number vaccinated)
-- It should be faster to pass args as vectors, because every $ call costs something
-- For drastic optimizing then store everything as vectors with matching indices that get updated & make data.table @ end (but this shouldn't matter too much, maybe check how many calls there are?) And probably gets over written by how long it takes to do split apply vs. data.table...
-- So only for ones where you don't have to do any aggregation!
-- Make init more flexible in how it initializes I & E seeds
-- Or seed location & tstep explicitly of starting cases?
-- components to add = puppy vaccination (in between campaigns)
-- and also immigration, colonization of empty patches?
-- Figure out how to flexibly pass additional arguments to functions passed through (i.e. incursion functions, etc.); if you want to pass to fit, pass in param list!
-- Else args
-- Double check using appropriate & vs. &&, | vs. || throughout
-- Limit ifelse statements
-- Store things as integers where possible
 
+- Example output environment for customizing summary functions
+
+- Applying mortality to exposed class?
+
+- Documentation on how to use & customize
+
+- Construct synthetic populations or use high res pop data to get estimates of spatial dog pops (popcompr?)
+
+- Benchmarks across scales, etc.
 ## Known limitations / potential extensions
 - Doesn't simulate expansion of occupied cells (i.e. colonization of patches by doggos)
 - Carrying capacity for growth
