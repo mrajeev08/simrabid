@@ -28,7 +28,8 @@ simrabid(
   coverage = FALSE,
   break_threshold = 0.8,
   by_admin = FALSE,
-  extra_pars = NULL
+  extra_pars = NULL,
+  routine_vacc = 0
 )
 }
 \arguments{
@@ -106,6 +107,8 @@ or administrative (or arbitrary unit) based on the shapefile}
 
 \item{extra_pars}{list, additional parameters that you might need for the summary
 or any other custom functions}
+
+\item{routine_vacc}{proportion of new born dogs vaccinated, defaults to zero}
 }
 \value{
 output from function passed to \code{summary_fun}
