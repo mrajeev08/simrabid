@@ -18,7 +18,7 @@ knitr::opts_chunk$set(
 
 To install the package from github:
 
-```{r setup}
+```{r setup, eval = FALSE}
 remotes::install_github("mrajeev08/simrabid")
 ```
 

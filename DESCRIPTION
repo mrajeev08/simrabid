@@ -7,7 +7,9 @@ Authors@R:
            role = c("aut", "cre"),
            email = "mrajeev@princeton.edu",
            comment = c(ORCID = "0000-0001-6030-4995"))
-Description: This package implements a stochastic individual-based model of canine rabies transmission.
+Description: This package implements a stochastic individual-based model of 
+canine rabies transmission. To learn more about simrabid, 
+start with the vignettes: browseVignettes(package = "simrabid")
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
