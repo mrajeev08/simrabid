@@ -1,29 +1,38 @@
 ---
-title: "Getting started with simrabid"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{Getting started with simrabid}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+output: github_document
 ---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
 )
 ```
 
-## Set-up and dependencies
+# simrabid
 
-To install the package from github:
+`simrabid` is an implementation of a spatially explicit, individual-based model of canine rabies. It is very much a work in progress!
 
-```{r setup, eval = FALSE}
-remotes::install_github("mrajeev08/simrabid")
+## Installation
+
+And the development version from [GitHub](https://github.com/) with:
+
+``` r
+# install.packages("devtools")
+devtools::install_github("mrajeev08/simrabid")
+
+# To install suggested packages & dependencies:
+devtools::install_github("mrajeev08/simrabid", dependencies = TRUE)
 ```
+## Minimum Working Example
 
-To install dependencies & vignettes:
-```{r}
+This is a basic example which shows you the very basics:
+
+```{r example}
 library(raster)
 library(data.table)
 library(sf)
@@ -32,24 +41,23 @@ library(dplyr)
 library(magrittr)
 library(simrabid)
 library(ggplot2)
-```
 
-## A minimum working example
-
-```{r}
+# Use the example serengeti shapefile in the package
 sd_shapefile <- st_read(system.file("extdata/sd_shapefile.shp", 
                                     package = "simrabid"))
 
-# 1. set up the space
+# 1. set up the space at 1000m res
 sd_shapefile$id_col <- 1:nrow(sd_shapefile)
 out <- setup_space(shapefile = sd_shapefile, resolution = 1000, id_col = "id_col", 
                    use_fasterize = TRUE)
+
+# Fake some pop data here
 pop_out <- out
 values(pop_out) <- rpois(ncell(pop_out), 20)
 pop_out[is.na(out)] <- NA
 plot(pop_out)
 
-# 2. set-up simulation framework
+# 2. set-up simulation framework (timesteps + demography)
 start_up <- setup_sim(start_date = "2002-01-01",
                       apprx_end_date = "2020-01-01", 
                       days_in_step = 7, 
@@ -60,21 +68,14 @@ start_up <- setup_sim(start_date = "2002-01-01",
                       params = list(start_pop = pop_out[]), 
                       by_admin = FALSE)
 
-weights <- cell_weights(covars = list(0),
-                        params = list(0),
-                        start_up$ncell, 
-                        leave_bounds = TRUE,
-                        allow_invalid = FALSE,
-                        cells_block = start_up$cells_block,
-                        cells_out_bounds = start_up$cells_out_bounds) 
-
+# Set up vaccination
 vacc_dt <- simrabid::sim_campaigns(locs = 1:75, campaign_prob = 0.9, 
                                    coverage = 0.7, sim_years = 20, 
                                    burn_in_years = 5,
                                    steps_in_year = 52)
 vacc_dt_none <- vacc_dt[0]
 
-# probs can be length ncells or a single values
+# Without vax
 system.time({
   test <- simrabid(start_up, start_vacc = 0.2, I_seeds = 3,
                  vacc_dt = vacc_dt_none,
@@ -90,7 +91,7 @@ system.time({
                  sequential = FALSE, allow_invalid = TRUE,
                  leave_bounds = TRUE, max_tries = 100,
                  summary_fun = return_env,
-                 track = TRUE,
+                 track = FALSE,
                  weights = NULL,
                  row_probs = NULL,
                  coverage = TRUE,
@@ -102,6 +103,7 @@ system.time({
 ggplot(test$I_dt) + geom_bar(aes(x = floor(t_infectious)))
 plot(colSums(test$N_mat))
 
+formals(use_mget)$names <- c("I_dt", "N_mat")
 system.time({
   test <- simrabid(start_up, start_vacc = 0.2, I_seeds = 3,
                  vacc_dt = vacc_dt,
@@ -116,7 +118,7 @@ system.time({
                  movement_fun = sim_movement_continuous,
                  sequential = TRUE, allow_invalid = TRUE,
                  leave_bounds = TRUE, max_tries = 100,
-                 summary_fun = return_env,
+                 summary_fun = use_mget,
                  track = TRUE,
                  weights = NULL,
                  row_probs = NULL,
@@ -126,65 +128,57 @@ system.time({
 }
 )
 
+# With vax
 ggplot(test$I_dt) + geom_bar(aes(x = floor(t_infectious)))
 plot(colSums(test$N_mat))
-
 ```
 
+`simrabid` is written to be modular, feel free to poke around the function documentation to see the options--technical vignettes coming soon!
 
-### Defaults
+## Roadmap
 
-### Simulation
+- A relative probability based movement model (i.e. movement probability is relative 
+  to index location, for instance if you want to account for landscape barriers (roads, rivers, etc.)); 
+  see old commit code for how this might work with a probability list;
 
-## Simulating movement
+- Use non utm coordinate space, instead use cellFromXY in raster and haversine distances 
+ to get location of cell id movements so that you can simulate across larger 
+ spatial scales; one issue is then your scale of aggregation gets distorted, aggregate grid cells somehow
+ so it's approximately 1 km?
 
-### Documenting environment from an example simulation (I_dt, I_mat, S_mat, N_mat)
+- Implement carrying capacity on pop growth, and replacement of dogs removed due to infection.
 
-## Simulating at different temporal / spatial scales
+- Implement colonization of uninhabited patches (with some limits so households can't pop up in space
+  that is uninhabitable, i.e. rivers/roads/etc.)
 
-## Simulating vaccination
+- Build a constructor class that gets passed to simrabid function so that only **valid** combinations
+  of model arguments can be passed, and you only have to test this once for N simulations. 
 
-## Customizing functions
+- Profile and speed up! 
+  - Vaccination function
+  - Filtering data.table
+  - Only track currently infectious + exposed linelist
+  - Easy fixes (i.e. storing things in the appropriate type, keys onf filters, etc.)
 
-### Summary function
+- Issue with intermediate scales where small admin units do not get matched to 
+  any grid cell
 
-### Secondary functions
-Example: incorporating human response to infection
+- Village metapopulation (separate function?)
 
-```{r}
+- Example output environment for customizing summary functions
 
-# Reduce transmission according to incidence at a given spatial & temporal scale
-test <- fucntion(n, params = list(R0 = 1.2, 
-                                  k = 1, 
-                                  get_vars = c("I_now$row_id", "admin_ids", "I"), 
-                                  by_admin = FALSE)) {
+- Applying mortality to exposed class?
 
-  # get the get vars (these are the ones inside)
-  
-  # original secondaries
-  secondaries <- rnbinom(n, size = params$k, mu = params$R0)
-  
-  if(by_admin) {
-    group_id <- admin_ids[I_now$row_id]
-    
-    # group I by admin id 
-    
-    # This is the #
-    
-    
-  }
-  # group them by their location (either at the admin or )
-  alloc <- data.table(secondaries, )
-}
+- Documentation on how to use & customize
 
-# Scale transmission with incidence (i.e. R0 is reduced proportional to incidence (at spatial and temporal window)))
+- Construct synthetic populations or use high res pop data to get estimates of spatial dog pops (popcompr?)
 
-# Scale transmission with incidence (i.e. R0 is reduced to given level at given incidence (spatial and temporal window))
+- Benchmarks across scales, etc.
 
-```
+## Bug fixes
 
-### Incursion functions
+- Issue with setup_space, id col has to be numeric
 
-## Parallelizing and wrapping function to do multiple simulations
-
-
+## Known limitations / potential extensions
+- Doesn't simulate expansion of occupied cells (i.e. colonization of patches by doggos)
+- Carrying capacity for growth
