@@ -101,7 +101,6 @@ system.time({
 )
 
 ggplot(test$I_dt) + geom_bar(aes(x = floor(t_infectious)))
-plot(colSums(test$N_mat))
 
 formals(use_mget)$names <- c("I_dt", "N_mat")
 system.time({
@@ -133,7 +132,7 @@ ggplot(test$I_dt) + geom_bar(aes(x = floor(t_infectious)))
 plot(colSums(test$N_mat))
 ```
 
-`simrabid` is written to be modular, feel free to poke around the function documentation to see the options--technical vignettes coming soon!
+`simrabid` is written to be modular, feel free to poke around the function documentation to see the options--technical vignettes coming
 
 ## Roadmap
 

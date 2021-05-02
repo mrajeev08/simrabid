@@ -15,13 +15,46 @@
 nbinom_constrained <- function(n,
                                params = list(R0 = 1.2, k = 1,
                                              max_secondaries = 100)) {
-
   secondaries <- rnbinom(n, size = params$k, mu = params$R0)
   secondaries[secondaries > params$max_secondaries] <- params$max_secondaries
 
   # return constrained!
   return(secondaries)
 }
+
+#' Secondary case distribution with additional constraint on minimum # of cases
+#'
+#' This function draws secondary cases from a negative binomial distribution,
+#' but constrained to a maximum (`max_secondaries`),
+#' where `R0` is the mean (mu in rnbinom) and `k` is the dispersion parameter
+#' (size in rnbinom). In addition, if a case is an introduction, secondaries
+#' are additionally constrained to a minimum (`min_secondaries`) number of cases.
+#' In general this serves as an example of how to customize functions using
+#' mget and a general template function of function(n, params) {...}.
+#'
+#' Passed to the param `secondary_fun` in \code{\link{simrabid}}.
+#'
+#' @param n number to draw
+#' @param params list of parameters
+#'
+#' @return integer vector, number of secondary cases, of length `n`
+#' @export
+#'
+nbinom_constrained_min <- function(n,
+                                   params = list(R0 = 1.2, k = 1,
+                                                 max_secodndaries = 100,
+                                                 min_secondaries = 1)) {
+
+  I_check <- mget("I_now", envir = parent.frame(1))$I_now
+  inds <- I_check$progen_id == -1L
+  secondaries <- rnbinom(n, size = params$k, mu = params$R0)
+  secondaries[secondaries > params$max_secondaries] <- params$max_secondaries
+  secondaries[inds & secondaries == 0] <- params$min_secondaries
+
+  return(secondaries)
+
+}
+
 
 #' Dispersal kernel distribution
 #'

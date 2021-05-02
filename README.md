@@ -144,18 +144,12 @@ system.time({
 }
 )
 #>    user  system elapsed 
-#>   6.234   0.750   7.788
+#>   5.764   0.643   6.580
 
 ggplot(test$I_dt) + geom_bar(aes(x = floor(t_infectious)))
 ```
 
 <img src="man/figures/README-example-2.png" width="100%" />
-
-``` r
-plot(colSums(test$N_mat))
-```
-
-<img src="man/figures/README-example-3.png" width="100%" />
 
 ``` r
 formals(use_mget)$names <- c("I_dt", "N_mat")
@@ -183,23 +177,22 @@ system.time({
 }
 )
 #>    user  system elapsed 
-#>  13.100   1.973  17.153
+#>   9.944   1.349  11.925
 
 # With vax
 ggplot(test$I_dt) + geom_bar(aes(x = floor(t_infectious)))
 ```
 
-<img src="man/figures/README-example-4.png" width="100%" />
+<img src="man/figures/README-example-3.png" width="100%" />
 
 ``` r
 plot(colSums(test$N_mat))
 ```
 
-<img src="man/figures/README-example-5.png" width="100%" />
+<img src="man/figures/README-example-4.png" width="100%" />
 
 `simrabid` is written to be modular, feel free to poke around the
 function documentation to see the options–technical vignettes coming
-soon!
 
 ## Roadmap
 
